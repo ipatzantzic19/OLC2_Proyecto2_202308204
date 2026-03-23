@@ -1,0 +1,20 @@
+{
+    "name": "golampi/ide-interpreter",
+    "description": "Golampi Language Interpreter - Full Stack IDE",
+    "type": "project",
+    "version": "1.4.2",
+    "require": {
+        "php": ">=8.0",
+        "antlr/antlr4-php-runtime": "^0.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "Golampi\\": "src/",
+            "": "generated/"
+        }
+    },
+    "scripts": {
+        "serve": "php -S localhost:8000 -t .",
+        "test": "php test/test.php"
+    }
+}

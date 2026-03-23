@@ -1,0 +1,15 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+    
+    # No reescribir archivos reales
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    
+    # Reescribir todas las peticiones a api.php
+    RewriteRule ^api/(.*) /api.php [QSA,L]
+    
+    # Permitir acceso a archivos de generación ANTLR
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule . - [L]
+</IfModule>
