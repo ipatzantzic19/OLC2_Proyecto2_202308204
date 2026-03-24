@@ -19,11 +19,11 @@ if [ ! -d "Backend" ] || [ ! -d "Frontend" ]; then
     exit 1
 fi
 
-# Start Backend (use api.php as router so /api/* routes work)
+# Start Backend (use index.php as router so /api/* routes work)
 echo -e "${BLUE}Starting Backend on port 8000...${NC}"
 cd Backend
-# Use api.php as router to ensure all /api requests are handled by the router
-php -S localhost:8000 api.php -t . > /tmp/golampi-backend.log 2>&1 &
+# Use index.php as router to ensure all /api requests are handled by the router
+php -S localhost:8000 -t . index.php > /tmp/golampi-backend.log 2>&1 &
 BACKEND_PID=$!
 echo -e "${GREEN}✓ Backend started (PID: $BACKEND_PID)${NC}"
 cd ..

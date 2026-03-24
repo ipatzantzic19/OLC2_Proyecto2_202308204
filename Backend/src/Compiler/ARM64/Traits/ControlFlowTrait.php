@@ -100,14 +100,52 @@ trait ControlFlowTrait
      */
     public function visitForInit($initCtx): void
     {
-        if (method_exists($initCtx, 'varDeclaration') && $initCtx->varDeclaration()) {
-            $this->visit($initCtx->varDeclaration());
-        } elseif (method_exists($initCtx, 'shortVarDeclaration') && $initCtx->shortVarDeclaration()) {
-            $this->visit($initCtx->shortVarDeclaration());
-        } elseif (method_exists($initCtx, 'assignment') && $initCtx->assignment()) {
-            $this->visit($initCtx->assignment());
-        } elseif (method_exists($initCtx, 'incDecStatement') && $initCtx->incDecStatement()) {
-            $this->visit($initCtx->incDecStatement());
+        try {
+            if (is_callable([$initCtx, 'varDeclaration'])) {
+                $result = $initCtx->varDeclaration();
+                if ($result !== null) {
+                    $this->visit($result);
+                    return;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Ignorar
+        }
+        
+        try {
+            if (is_callable([$initCtx, 'shortVarDeclaration'])) {
+                $result = $initCtx->shortVarDeclaration();
+                if ($result !== null) {
+                    $this->visit($result);
+                    return;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Ignorar
+        }
+        
+        try {
+            if (is_callable([$initCtx, 'assignment'])) {
+                $result = $initCtx->assignment();
+                if ($result !== null) {
+                    $this->visit($result);
+                    return;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Ignorar
+        }
+        
+        try {
+            if (is_callable([$initCtx, 'incDecStatement'])) {
+                $result = $initCtx->incDecStatement();
+                if ($result !== null) {
+                    $this->visit($result);
+                    return;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Ignorar
         }
     }
 
@@ -117,10 +155,28 @@ trait ControlFlowTrait
      */
     public function visitForPost($postCtx): void
     {
-        if (method_exists($postCtx, 'assignment') && $postCtx->assignment()) {
-            $this->visit($postCtx->assignment());
-        } elseif (method_exists($postCtx, 'incDecStatement') && $postCtx->incDecStatement()) {
-            $this->visit($postCtx->incDecStatement());
+        try {
+            if (is_callable([$postCtx, 'assignment'])) {
+                $result = $postCtx->assignment();
+                if ($result !== null) {
+                    $this->visit($result);
+                    return;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Ignorar
+        }
+        
+        try {
+            if (is_callable([$postCtx, 'incDecStatement'])) {
+                $result = $postCtx->incDecStatement();
+                if ($result !== null) {
+                    $this->visit($result);
+                    return;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Ignorar
         }
     }
 

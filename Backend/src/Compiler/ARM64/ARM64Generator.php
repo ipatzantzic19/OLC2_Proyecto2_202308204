@@ -121,10 +121,14 @@ class ARM64Generator extends \GolampiBaseVisitor
             if (!($child instanceof \Antlr\Antlr4\Runtime\ParserRuleContext)) continue;
 
             $funcDecl = null;
-            if (method_exists($child, 'functionDeclaration')) {
-                $funcDecl = $child->functionDeclaration();
-            } elseif (method_exists($child, 'ID') && method_exists($child, 'block')) {
-                $funcDecl = $child;
+            try {
+                if (is_callable([$child, 'functionDeclaration'])) {
+                    $funcDecl = $child->functionDeclaration();
+                } elseif (is_callable([$child, 'ID']) && is_callable([$child, 'block'])) {
+                    $funcDecl = $child;
+                }
+            } catch (\Throwable $e) {
+                // Ignorar si no se puede llamar
             }
 
             if ($funcDecl !== null) {
@@ -247,9 +251,13 @@ class ARM64Generator extends \GolampiBaseVisitor
         $params   = [];
         $paramList = null;
 
-        // Intentar acceder al paramList directamente
-        if (method_exists($funcDecl, 'paramList')) {
-            $paramList = $funcDecl->paramList();
+        // Intentar acceder al paramList usando try-catch
+        try {
+            if (is_callable([$funcDecl, 'parameterList'])) {
+                $paramList = $funcDecl->parameterList();
+            }
+        } catch (\Throwable $e) {
+            // Ignorar si no existe
         }
 
         if ($paramList === null) {
@@ -266,10 +274,14 @@ class ARM64Generator extends \GolampiBaseVisitor
             }
 
             // Cada nodo param debe tener ID() y type()
-            if (method_exists($child, 'ID') && method_exists($child, 'type')) {
-                $pName   = $child->ID()->getText();
-                $pType   = $this->getTypeName($child->type());
-                $params[] = ['name' => $pName, 'type' => $pType];
+            try {
+                if (is_callable([$child, 'ID']) && is_callable([$child, 'type'])) {
+                    $pName   = $child->ID()->getText();
+                    $pType   = $this->getTypeName($child->type());
+                    $params[] = ['name' => $pName, 'type' => $pType];
+                }
+            } catch (\Throwable $e) {
+                // Ignorar parámetros con problemas
             }
         }
 

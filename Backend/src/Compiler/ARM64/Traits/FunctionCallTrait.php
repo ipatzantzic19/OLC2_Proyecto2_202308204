@@ -63,14 +63,30 @@ trait FunctionCallTrait
             $this->emit("bl $name");
         } elseif (count($args) === 1) {
             $argCtx = $args[0];
-            $this->visit(method_exists($argCtx, 'expression') ? $argCtx->expression() : $argCtx);
+            $exprNode = null;
+            try {
+                if (is_callable([$argCtx, 'expression'])) {
+                    $exprNode = $argCtx->expression();
+                }
+            } catch (\Throwable $e) {
+                // Ignorar
+            }
+            $this->visit($exprNode ?? $argCtx);
             // x0 ya tiene el argumento
             $this->emit("bl $name");
         } else {
             // Multi-args: Fase 2
             // Por ahora: evaluar solo el primero y llamar
             $argCtx = $args[0];
-            $this->visit(method_exists($argCtx, 'expression') ? $argCtx->expression() : $argCtx);
+            $exprNode = null;
+            try {
+                if (is_callable([$argCtx, 'expression'])) {
+                    $exprNode = $argCtx->expression();
+                }
+            } catch (\Throwable $e) {
+                // Ignorar
+            }
+            $this->visit($exprNode ?? $argCtx);
             $this->emit("bl $name",  '(multi-args: simplificado — Fase 2)');
         }
 
@@ -126,9 +142,15 @@ trait FunctionCallTrait
             $argCtx = $argCtxList[$i];
 
             // Evaluar argumento → x0
-            $exprCtx = method_exists($argCtx, 'expression')
-                ? $argCtx->expression()
-                : $argCtx;
+            $exprCtx = null;
+            try {
+                if (is_callable([$argCtx, 'expression'])) {
+                    $exprCtx = $argCtx->expression();
+                }
+            } catch (\Throwable $e) {
+                // Ignorar
+            }
+            $exprCtx = $exprCtx ?? $argCtx;
 
             $type = $exprCtx ? ($this->visit($exprCtx) ?? 'int32') : 'int32';
 
