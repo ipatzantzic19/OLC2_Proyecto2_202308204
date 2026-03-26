@@ -5,6 +5,8 @@ namespace Golampi\Compiler\ARM64;
 use Golampi\Compiler\CompilationResult;
 use Golampi\Compiler\ARM64\Traits\EmitterTrait;
 use Golampi\Compiler\ARM64\Traits\StringPoolTrait;
+use Golampi\Compiler\ARM64\Traits\FloatOpsTrait;
+use Golampi\Compiler\ARM64\Traits\StringOpsTrait;
 use Golampi\Compiler\ARM64\Traits\DeclarationsTrait;
 use Golampi\Compiler\ARM64\Traits\AssignmentsTrait;
 use Golampi\Compiler\ARM64\Traits\ControlFlowTrait;
@@ -16,47 +18,52 @@ use Golampi\Compiler\ARM64\Traits\HelpersTrait;
 require_once __DIR__ . '/../../../generated/GolampiVisitor.php';
 require_once __DIR__ . '/../../../generated/GolampiBaseVisitor.php';
 
+// Carga defensiva de traits para entornos con autoload desactualizado.
+require_once __DIR__ . '/Traits/EmitterTrait.php';
+require_once __DIR__ . '/Traits/StringPoolTrait.php';
+require_once __DIR__ . '/Traits/FloatOpsTrait.php';
+require_once __DIR__ . '/Traits/StringOpsTrait.php';
+require_once __DIR__ . '/Traits/DeclarationsTrait.php';
+require_once __DIR__ . '/Traits/AssignmentsTrait.php';
+require_once __DIR__ . '/Traits/ControlFlowTrait.php';
+require_once __DIR__ . '/Traits/ExpressionsTrait.php';
+require_once __DIR__ . '/Traits/LiteralsTrait.php';
+require_once __DIR__ . '/Traits/FunctionCallTrait.php';
+require_once __DIR__ . '/Traits/HelpersTrait.php';
+
 /**
- * ARM64Generator
+ * ARM64Generator — Fase 2
  *
  * Generador de código ARM64 (AArch64) para el lenguaje Golampi.
- * Esta clase actúa como orquestador: declara el estado compartido y
- * delega toda la lógica de generación en traits especializados.
+ * Orquestador principal: declara el estado compartido y delega en traits.
  *
  * Traits y responsabilidades:
- *
- *  EmitterTrait        emit(), label(), comment(), buildAssembly(),
- *                      pushStack(), emitBinaryOp(), newLabel()
- *
+ *  EmitterTrait        emit(), label(), comment(), buildAssembly()
  *  StringPoolTrait     internString(), asmEscape()
- *
- *  DeclarationsTrait   visitVarDecl*, visitShortVarDecl, visitConstDecl,
- *                      prescanBlock/Node/Ids
- *
+ *  FloatOpsTrait       internFloat(), emitFloat*(), pushFloatStack()  ← NUEVO Fase 2
+ *  StringOpsTrait      emitStringConcat(), emitStrlen(), emitSubstr()  ← NUEVO Fase 2
+ *  DeclarationsTrait   visitVarDecl*, visitShortVarDecl, visitConstDecl
  *  AssignmentsTrait    visitSimpleAssignment, visitIncrement/Decrement
+ *  ControlFlowTrait    visitIf*, visitFor*, visitSwitch, visitBreak/Continue/Return
+ *  ExpressionsTrait    operadores binarios (int y float), unarios
+ *  LiteralsTrait       int32, float32 (SIMD), rune, string, bool, nil
+ *  FunctionCallTrait   fmt.Println, funciones usuario (multi-param), builtins
+ *  HelpersTrait        tipos, allocVar, storeDefault, addSymbol, visitIdentifier
  *
- *  ControlFlowTrait    visitIf*, visitFor*, visitSwitch,
- *                      visitBreak/Continue/Return, visitForInit (public),
- *                      visitForPost (public)
- *
- *  ExpressionsTrait    visitExpression, visitLogical*, visitEquality,
- *                      visitRelational, visitAdditive, visitMultiplicative,
- *                      visitUnary*, visitGroupedExpression
- *
- *  LiteralsTrait       visitIntLiteral, visitFloatLiteral, visitRuneLiteral,
- *                      visitStringLiteral, visitTrueLiteral, visitFalseLiteral,
- *                      visitNilLiteral
- *
- *  FunctionCallTrait   visitFunctionCall, visitExpression/AddressArgument,
- *                      generateFmtPrintln, generatePrintValue
- *
- *  HelpersTrait        getTypeName, allocVar, storeDefault,
- *                      addSymbol, addError, visitIdentifier
+ * Registro de activación por función (conforme a Aho et al.):
+ *  [fp + 0]  x29 guardado (enlace de control)
+ *  [fp + 8]  x30 guardado (dirección de retorno)
+ *  [fp - 8]  param 0 / local 0
+ *  [fp - 16] param 1 / local 1
+ *  ...
+ *  [fp - N]  último local / array base
  */
 class ARM64Generator extends \GolampiBaseVisitor
 {
     use EmitterTrait;
     use StringPoolTrait;
+    use FloatOpsTrait;      // ← Fase 2
+    use StringOpsTrait;     // ← Fase 2
     use DeclarationsTrait;
     use AssignmentsTrait;
     use ControlFlowTrait;
@@ -65,13 +72,20 @@ class ARM64Generator extends \GolampiBaseVisitor
     use FunctionCallTrait;
     use HelpersTrait;
 
-    // ── Secciones de ensamblador ──────────────────────────────────────────────
+    // ── Secciones ─────────────────────────────────────────────────────────────
     protected array $dataLines = [];
     protected array $textLines = [];
 
     // ── Pool de strings ───────────────────────────────────────────────────────
     protected array $stringPool = [];
     protected int   $strIdx     = 0;
+
+    // ── Pool de floats (Fase 2) ───────────────────────────────────────────────
+    protected array $floatPool = [];
+    protected int   $floatIdx  = 0;
+
+    // ── Helpers runtime (Fase 2) ──────────────────────────────────────────────
+    protected array $postTextLines = [];
 
     // ── Contador de etiquetas ─────────────────────────────────────────────────
     protected int $labelIdx = 0;
@@ -86,8 +100,13 @@ class ARM64Generator extends \GolampiBaseVisitor
     // ── Stack break/continue ──────────────────────────────────────────────────
     protected array $loopStack = [];
 
-    // ── Funciones de usuario registradas ─────────────────────────────────────
+    // ── Funciones de usuario ──────────────────────────────────────────────────
     protected array $userFunctions = [];
+
+    // ── Helpers de strings runtime emitidos ───────────────────────────────────
+    private bool $concatHelperEmitted = false;
+    private bool $substrHelperEmitted = false;
+    private bool $nowHelperEmitted    = false;
 
     // ═════════════════════════════════════════════════════════════════════════
     //  API PÚBLICA
@@ -115,22 +134,12 @@ class ARM64Generator extends \GolampiBaseVisitor
     {
         $mainDecl = null;
 
-        // Pasada 1: registrar funciones (hoisting)
+        // Pasada 1: registro de funciones (hoisting)
         for ($i = 0; $i < $ctx->getChildCount() - 1; $i++) {
             $child = $ctx->getChild($i);
             if (!($child instanceof \Antlr\Antlr4\Runtime\ParserRuleContext)) continue;
 
-            $funcDecl = null;
-            try {
-                if (is_callable([$child, 'functionDeclaration'])) {
-                    $funcDecl = $child->functionDeclaration();
-                } elseif (is_callable([$child, 'ID']) && is_callable([$child, 'block'])) {
-                    $funcDecl = $child;
-                }
-            } catch (\Throwable $e) {
-                // Ignorar si no se puede llamar
-            }
-
+            $funcDecl = $this->extractFuncDecl($child);
             if ($funcDecl !== null) {
                 $name = $funcDecl->ID()->getText();
                 if ($name === 'main') {
@@ -146,6 +155,7 @@ class ARM64Generator extends \GolampiBaseVisitor
             return null;
         }
 
+        // Generar main primero, luego las funciones de usuario
         $this->generateFunction($mainDecl);
         foreach ($this->userFunctions as $decl) {
             $this->generateFunction($decl);
@@ -168,10 +178,10 @@ class ARM64Generator extends \GolampiBaseVisitor
 
         $this->func = new FunctionContext($name);
 
-        // 1. Registrar parámetros PRIMERO para que tengan slots antes del prescan
+        // 1. Registrar parámetros con tipos correctos
         $params = $this->extractParams($funcDecl);
         foreach ($params as $p) {
-            $this->func->allocLocal($p['name'], $p['type']);
+            $this->func->allocLocal($p['name'], $p['type'], true);
             $this->addSymbol($p['name'], $p['type'], $name, 'param', $line, $col);
         }
 
@@ -184,39 +194,48 @@ class ARM64Generator extends \GolampiBaseVisitor
         $this->func->epilogueLabel = $epilogueLabel;
         $frameSize                 = $this->func->getFrameSize();
 
-        // Prólogo
+        // ── Prólogo ───────────────────────────────────────────────────────
+        $this->textLines[] = '';
         $this->label($name);
-        $this->comment("── función $name ──");
-        $this->emit('stp x29, x30, [sp, #-16]!',  'guardar fp y lr');
-        $this->emit('mov x29, sp',                  'frame pointer');
+        $this->comment("── función $name ── (registro de activación)");
+        $this->emit('stp x29, x30, [sp, #-16]!',   'guardar fp (enlace control) y lr');
+        $this->emit('mov x29, sp',                   'establecer frame pointer');
+
         if ($frameSize > 0) {
-            $this->emit("sub sp, sp, #$frameSize",  "reservar $frameSize bytes");
+            $this->emit("sub sp, sp, #$frameSize",   "reservar $frameSize bytes (locales + params)");
         }
 
-        // 3. Guardar parámetros del registro al stack (convención AArch64: x0..x7)
-        foreach ($params as $idx => $p) {
-            if ($idx >= 8) break;
+        // 3. Copiar parámetros de registros al stack frame
+        // Convención AArch64: int/bool/string en x0–x7, float32 en s0–s7
+        $intParamIdx   = 0;
+        $floatParamIdx = 0;
+        foreach ($params as $p) {
             $offset = $this->func->getOffset($p['name']);
-            $this->comment("param {$p['name']} (x$idx) → [fp-$offset]");
-            $this->emit("str x$idx, [x29, #-$offset]");
+            if ($p['type'] === 'float32') {
+                $reg = 's' . $floatParamIdx++;
+                $this->emit("str $reg, [x29, #-$offset]",  "param {$p['name']} ($reg) → frame");
+            } else {
+                $reg = 'x' . $intParamIdx++;
+                $this->emit("str $reg, [x29, #-$offset]",  "param {$p['name']} ($reg) → frame");
+            }
         }
 
-        // Cuerpo
+        // ── Cuerpo ────────────────────────────────────────────────────────
         if ($funcDecl->block()) {
             $this->generateBlock($funcDecl->block());
         }
 
-        // Epílogo
+        // ── Epílogo ───────────────────────────────────────────────────────
         $this->label($epilogueLabel);
+        $this->comment("── epílogo $name ──");
         if ($frameSize > 0) {
-            $this->emit("add sp, sp, #$frameSize",  'liberar locales');
+            $this->emit("add sp, sp, #$frameSize",   'liberar locales');
         }
-        $this->emit('ldp x29, x30, [sp], #16',     'restaurar fp y lr');
+        $this->emit('ldp x29, x30, [sp], #16',       'restaurar fp y lr');
         if ($name === 'main') {
-            $this->emit('mov x0, #0',               'exit code 0');
+            $this->emit('mov x0, #0',                'exit code 0');
         }
         $this->emit('ret');
-        $this->textLines[] = '';
 
         $this->func = null;
     }
@@ -240,51 +259,53 @@ class ARM64Generator extends \GolampiBaseVisitor
     // ═════════════════════════════════════════════════════════════════════════
 
     /**
-     * Extrae la lista de parámetros de una declaración de función.
-     * Devuelve array de ['name' => string, 'type' => string].
-     *
-     * Soporta gramáticas con paramList() y también iteración directa
-     * sobre los hijos del nodo funcDecl buscando contextos param.
+     * Extrae parámetros de una declaración de función.
+     * Retorna array de ['name'=>string, 'type'=>string, 'is_pointer'=>bool].
      */
     private function extractParams($funcDecl): array
     {
-        $params   = [];
+        $params    = [];
         $paramList = null;
 
-        // Intentar acceder al paramList usando try-catch
         try {
             if (is_callable([$funcDecl, 'parameterList'])) {
                 $paramList = $funcDecl->parameterList();
             }
-        } catch (\Throwable $e) {
-            // Ignorar si no existe
-        }
+        } catch (\Throwable $e) {}
 
-        if ($paramList === null) {
-            return $params;
-        }
+        if ($paramList === null) return $params;
 
-        // Iterar sobre hijos del paramList: param (COMMA param)*
         for ($i = 0; $i < $paramList->getChildCount(); $i++) {
             $child = $paramList->getChild($i);
+            if (!($child instanceof \Antlr\Antlr4\Runtime\ParserRuleContext)) continue;
 
-            // Saltar tokens (comas, paréntesis)
-            if (!($child instanceof \Antlr\Antlr4\Runtime\ParserRuleContext)) {
-                continue;
-            }
-
-            // Cada nodo param debe tener ID() y type()
             try {
                 if (is_callable([$child, 'ID']) && is_callable([$child, 'type'])) {
-                    $pName   = $child->ID()->getText();
-                    $pType   = $this->getTypeName($child->type());
-                    $params[] = ['name' => $pName, 'type' => $pType];
+                    $pName      = $child->ID()->getText();
+                    $pType      = $this->getTypeName($child->type());
+                    $isPointer  = str_starts_with(get_class($child), 'Context\\PointerParameter');
+                    $params[]   = ['name' => $pName, 'type' => $pType, 'is_pointer' => $isPointer];
                 }
-            } catch (\Throwable $e) {
-                // Ignorar parámetros con problemas
-            }
+            } catch (\Throwable $e) {}
         }
 
         return $params;
+    }
+
+    /**
+     * Extrae la declaración de función de un nodo declaration del árbol.
+     */
+    private function extractFuncDecl($child): ?object
+    {
+        try {
+            if (is_callable([$child, 'functionDeclaration'])) {
+                $fd = $child->functionDeclaration();
+                if ($fd !== null) return $fd;
+            }
+            if (is_callable([$child, 'ID']) && is_callable([$child, 'block'])) {
+                return $child;
+            }
+        } catch (\Throwable $e) {}
+        return null;
     }
 }

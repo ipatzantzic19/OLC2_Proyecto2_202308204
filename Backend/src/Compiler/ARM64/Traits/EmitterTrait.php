@@ -3,49 +3,54 @@
 namespace Golampi\Compiler\ARM64\Traits;
 
 /**
- * EmitterTrait
+ * EmitterTrait — Fase 2
  *
- * Responsabilidad: escribir instrucciones ARM64 en el buffer de texto,
- * manejar etiquetas y comentarios, y construir el string final de ensamblador.
+ * Escribe instrucciones ARM64, gestiona etiquetas y comentarios,
+ * y construye el string final de ensamblador.
+ *
+ * Cambios Fase 2:
+ *   - $postTextLines: buffer para helpers (golampi_concat, golampi_substr, etc.)
+ *     que se emiten AL FINAL del assembly, después de todas las funciones.
+ *   - buildAssembly(): incluye los helpers del postTextLines y el pool de floats.
  *
  * Estado que usa de la clase:
  *   array  $dataLines
  *   array  $textLines
+ *   array  $postTextLines   ← NUEVO
  *   int    $labelIdx
  */
 trait EmitterTrait
 {
+    /** Buffer de líneas de texto que se emiten al final (helpers runtime). */
+    protected array $postTextLines = [];
+
     // ── Escritura de instrucciones ────────────────────────────────────────────
 
-    /** Emite una instrucción indentada con comentario opcional. */
     protected function emit(string $instr, string $comment = ''): void
     {
         $line = "\t" . $instr;
         if ($comment !== '') {
-            $line .= str_repeat(' ', max(1, 40 - strlen($line))) . '// ' . $comment;
+            $padding = max(1, 44 - strlen($line));
+            $line .= str_repeat(' ', $padding) . '// ' . $comment;
         }
         $this->textLines[] = $line;
     }
 
-    /** Emite una etiqueta (sin indentación). */
     protected function label(string $name): void
     {
         $this->textLines[] = $name . ':';
     }
 
-    /** Emite una línea de comentario. */
     protected function comment(string $text): void
     {
         $this->textLines[] = "\t// " . $text;
     }
 
-    /** Añade una línea a la sección .data. */
     protected function addData(string $line): void
     {
         $this->dataLines[] = $line;
     }
 
-    /** Genera una etiqueta única con el prefijo dado. */
     protected function newLabel(string $prefix = 'L'): string
     {
         return '.' . $prefix . '_' . ($this->labelIdx++);
@@ -53,11 +58,12 @@ trait EmitterTrait
 
     // ── Helpers de stack / operaciones binarias ───────────────────────────────
 
-    /** Apila x0 al stack (mantiene alineación de 16 bytes). */
+    /** Apila x0 al stack (alineación 16). */
     protected function pushStack(): void
     {
         $this->emit('sub sp, sp, #16');
         $this->emit('str x0, [sp]');
+        if ($this->func) $this->func->pushTemp();
     }
 
     /**
@@ -78,21 +84,32 @@ trait EmitterTrait
     // ── Construcción del ensamblador final ────────────────────────────────────
 
     /**
-     * Ensambla las secciones .data y .text en el string final ARM64.
+     * Ensambla las secciones .data y .text en el string ARM64 final.
+     *
+     * Estructura del archivo .s generado:
+     *   1. Cabecera con instrucciones de uso
+     *   2. .arch armv8-a
+     *   3. Sección .data (strings, floats, buffers)
+     *   4. Sección .text (código de funciones)
+     *   5. Helpers de runtime (golampi_concat, etc.) ← postTextLines
      */
     protected function buildAssembly(): string
     {
         $lines   = [];
+
+        // ── Cabecera ──────────────────────────────────────────────────────────
         $lines[] = '// ============================================================';
-        $lines[] = '// Golampi Compiler — Fase 1 — ARM64 (AArch64)';
-        $lines[] = '// Compilar: aarch64-linux-gnu-gcc -o prog program.s';
-        $lines[] = '// Ejecutar: qemu-aarch64 -L /usr/aarch64-linux-gnu ./prog';
+        $lines[] = '// Golampi Compiler — Fase 2 — ARM64 (AArch64)';
+        $lines[] = '// Compilar:';
+        $lines[] = '//   aarch64-linux-gnu-gcc -o programa program.s -lc';
+        $lines[] = '// Ejecutar:';
+        $lines[] = '//   qemu-aarch64 -L /usr/aarch64-linux-gnu ./programa';
         $lines[] = '// ============================================================';
         $lines[] = '.arch armv8-a';
         $lines[] = '';
 
+        // ── Sección .data (strings, floats, buffers) ──────────────────────────
         if (!empty($this->dataLines)) {
-            // macOS usa __DATA, Linux usa .data — generamos la directiva portable
             $lines[] = '.section __DATA,__data';
             $lines[] = '.section .data';
             foreach ($this->dataLines as $l) {
@@ -101,12 +118,24 @@ trait EmitterTrait
             $lines[] = '';
         }
 
+        // ── Sección .text (funciones compiladas) ──────────────────────────────
         $lines[] = '.section .text';
         $lines[] = '.global main';
         $lines[] = '';
-
         foreach ($this->textLines as $l) {
             $lines[] = $l;
+        }
+
+        // ── Helpers de runtime (golampi_concat, substr, now) ─────────────────
+        if (!empty($this->postTextLines)) {
+            $lines[] = '';
+            $lines[] = '// ── Runtime helpers Golampi ─────────────────────────────────';
+            foreach ($this->postTextLines as $block) {
+                // Cada bloque ya viene con sus saltos de línea internos
+                foreach (explode("\n", $block) as $line) {
+                    $lines[] = $line;
+                }
+            }
         }
 
         return implode("\n", $lines);

@@ -3,18 +3,31 @@
 namespace Golampi\Compiler\ARM64\Traits;
 
 /**
- * ExpressionsTrait
+ * ExpressionsTrait — Fase 2
  *
- * Responsabilidad: generar código ARM64 para expresiones.
- * Todas las expresiones dejan su resultado en x0 y devuelven el tipo PHP string.
+ * Genera código ARM64 para expresiones con soporte completo de tipos:
+ *   - int32 : resultado en x0
+ *   - float32: resultado en s0
+ *   - bool   : resultado en x0 (0 o 1)
+ *   - string : resultado en x0 (puntero)
+ *   - rune   : resultado en x0 (alias int32)
  *
- * Estrategia para operadores binarios:
- *   1. Evaluar lhs → x0
- *   2. pushStack()  → apila x0 (lhs)
- *   3. Evaluar rhs → x0
- *   4. ldr x1, [sp] → recupera lhs en x1
- *   5. add sp, sp, #16
- *   6. emitBinaryOp(op) → resultado en x0
+ * Tabla de promoción de tipos (del enunciado):
+ *   int32  + int32   = int32     (add x0, x1, x0)
+ *   int32  + float32 = float32   (scvtf lhs, fadd)
+ *   float32+ int32   = float32   (scvtf rhs, fadd)
+ *   float32+ float32 = float32   (fadd s0, s1, s0)
+ *   string + string  = string    (concat helper)
+ *   rune   + int32   = int32     (add)
+ *   rune   + rune    = int32     (add)
+ *
+ * Estrategia de temporales (Aho et al. — descriptores):
+ *   Cada sub-expresión deja su resultado en x0 (int) o s0 (float).
+ *   Para operadores binarios:
+ *     1. Evaluar lhs → push al stack
+ *     2. Evaluar rhs → x0 / s0
+ *     3. pop lhs del stack → x1 / s1
+ *     4. Emitir instrucción binaria → resultado en x0 / s0
  */
 trait ExpressionsTrait
 {
@@ -25,7 +38,7 @@ trait ExpressionsTrait
         return $this->visit($ctx->logicalOr());
     }
 
-    // ─── Lógica: || (con cortocircuito) ──────────────────────────────────────
+    // ─── OR lógico (cortocircuito) ───────────────────────────────────────────
 
     public function visitLogicalOr($ctx)
     {
@@ -47,11 +60,11 @@ trait ExpressionsTrait
 
         $this->label($endLabel);
         $this->emit('cmp x0, #0');
-        $this->emit('cset x0, ne');
+        $this->emit('cset x0, ne',              'bool resultado OR');
         return 'bool';
     }
 
-    // ─── Lógica: && (con cortocircuito) ──────────────────────────────────────
+    // ─── AND lógico (cortocircuito) ──────────────────────────────────────────
 
     public function visitLogicalAnd($ctx)
     {
@@ -73,7 +86,7 @@ trait ExpressionsTrait
 
         $this->label($endLabel);
         $this->emit('cmp x0, #0');
-        $this->emit('cset x0, ne');
+        $this->emit('cset x0, ne',              'bool resultado AND');
         return 'bool';
     }
 
@@ -85,15 +98,23 @@ trait ExpressionsTrait
             return $this->visit($ctx->relational(0));
         }
 
-        $this->visit($ctx->relational(0));
-        $this->pushStack();
+        $lhsType = $this->visit($ctx->relational(0));
+        $op      = $ctx->getChild(1)->getText();
 
-        $op = $ctx->getChild(1)->getText();
-        $this->visit($ctx->relational(1));
-        $this->emit('ldr x1, [sp]');
-        $this->emit('add sp, sp, #16');
-        $this->emit('cmp x1, x0');
-        $this->emit($op === '==' ? 'cset x0, eq' : 'cset x0, ne');
+        if ($lhsType === 'float32') {
+            // float: guardar s0 en stack
+            $this->pushFloatStack();
+            $this->visit($ctx->relational(1));
+            $this->popFloatStack();     // s1 = lhs, s0 = rhs
+            $this->emitFloatComparison($op);
+        } else {
+            $this->pushStack();
+            $this->visit($ctx->relational(1));
+            $this->emit('ldr x1, [sp]');
+            $this->emit('add sp, sp, #16');
+            $this->emit('cmp x1, x0');
+            $this->emit($op === '==' ? 'cset x0, eq' : 'cset x0, ne');
+        }
         return 'bool';
     }
 
@@ -105,21 +126,27 @@ trait ExpressionsTrait
             return $this->visit($ctx->additive(0));
         }
 
-        $this->visit($ctx->additive(0));
-        $this->pushStack();
+        $lhsType = $this->visit($ctx->additive(0));
+        $op      = $ctx->getChild(1)->getText();
 
-        $op = $ctx->getChild(1)->getText();
-        $this->visit($ctx->additive(1));
-        $this->emit('ldr x1, [sp]');   // x1 = lhs
-        $this->emit('add sp, sp, #16');
-        $this->emit('cmp x1, x0');     // cmp lhs, rhs
-
-        $cond = match ($op) {
-            '>'  => 'gt', '>=' => 'ge',
-            '<'  => 'lt', '<=' => 'le',
-            default => 'eq'
-        };
-        $this->emit("cset x0, $cond");
+        if ($lhsType === 'float32') {
+            $this->pushFloatStack();
+            $this->visit($ctx->additive(1));
+            $this->popFloatStack();
+            $this->emitFloatComparison($op);
+        } else {
+            $this->pushStack();
+            $this->visit($ctx->additive(1));
+            $this->emit('ldr x1, [sp]');
+            $this->emit('add sp, sp, #16');
+            $this->emit('cmp x1, x0');
+            $cond = match ($op) {
+                '>'  => 'gt', '>=' => 'ge',
+                '<'  => 'lt', '<=' => 'le',
+                default => 'eq'
+            };
+            $this->emit("cset x0, $cond");
+        }
         return 'bool';
     }
 
@@ -136,15 +163,53 @@ trait ExpressionsTrait
 
         for ($i = 1; $i < $ctx->getChildCount(); $i += 2) {
             $op = $ctx->getChild($i)->getText();
-            $this->pushStack();
-            $this->visit($ctx->multiplicative($mIdx++));
-            $this->emit('ldr x1, [sp]');
-            $this->emit('add sp, sp, #16');
 
-            if ($type === 'string' && $op === '+') {
-                // Concatenación → Fase 2
-                $this->addError('Semántico', 'Concatenación de strings: disponible en Fase 2', 0, 0);
+            if ($type === 'float32') {
+                $this->pushFloatStack();
+                $rhsType = $this->visit($ctx->multiplicative($mIdx++));
+                // Si rhs es int32, convertir a float
+                if ($rhsType === 'int32' || $rhsType === 'rune') {
+                    $this->emitIntToFloat();
+                }
+                $this->popFloatStack();   // s1=lhs, s0=rhs
+                $this->emitFloatBinaryOp($op);
+
+            } elseif ($type === 'int32' || $type === 'rune') {
+                // Verificar si rhs es float → promover lhs
+                $this->pushStack();
+                $rhsType = $this->visit($ctx->multiplicative($mIdx++));
+
+                if ($rhsType === 'float32') {
+                    // Promover lhs int32 → float32
+                    // lhs está en stack como bits, recuperar y convertir
+                    $this->emit('ldr x1, [sp]');
+                    $this->emit('add sp, sp, #16');
+                    $this->emit('scvtf s1, w1',      'lhs int32 → float32');
+                    // s0 ya tiene rhs float
+                    $this->emitFloatBinaryOp($op);
+                    $type = 'float32';
+                } else {
+                    $this->emit('ldr x1, [sp]');
+                    $this->emit('add sp, sp, #16');
+                    if ($op === '+') $this->emit('add x0, x1, x0');
+                    else             $this->emit('sub x0, x1, x0');
+                }
+
+            } elseif ($type === 'string' && $op === '+') {
+                // Concatenación de strings
+                $this->pushStack();                    // push lhs ptr
+                $this->visit($ctx->multiplicative($mIdx++));  // rhs en x0
+                $this->emit('mov x1, x0',             'rhs string → x1');
+                $this->emit('ldr x0, [sp]',           'lhs string ← stack → x0');
+                $this->emit('add sp, sp, #16');
+                $this->emitStringConcat();             // bl golampi_concat, resultado x0
+
             } else {
+                // Tipo no soportado para esta operación
+                $this->pushStack();
+                $this->visit($ctx->multiplicative($mIdx++));
+                $this->emit('ldr x1, [sp]');
+                $this->emit('add sp, sp, #16');
                 $this->emitBinaryOp($op);
             }
         }
@@ -164,19 +229,39 @@ trait ExpressionsTrait
 
         for ($i = 1; $i < $ctx->getChildCount(); $i += 2) {
             $op = $ctx->getChild($i)->getText();
-            $this->pushStack();
-            $this->visit($ctx->unary($uIdx++));
-            $this->emit('ldr x1, [sp]');
-            $this->emit('add sp, sp, #16');
 
-            switch ($op) {
-                case '*': $this->emit('mul x0, x1, x0');  break;
-                case '/': $this->emit('sdiv x0, x1, x0'); break;
-                case '%':
-                    // x0 = x1 % x0  →  x0 = x1 - (x1 / x0) * x0
-                    $this->emit('sdiv x2, x1, x0');
-                    $this->emit('msub x0, x2, x0, x1');
-                    break;
+            if ($type === 'float32') {
+                $this->pushFloatStack();
+                $rhsType = $this->visit($ctx->unary($uIdx++));
+                if ($rhsType === 'int32' || $rhsType === 'rune') {
+                    $this->emitIntToFloat();
+                }
+                $this->popFloatStack();
+                $this->emitFloatBinaryOp($op);
+
+            } else {
+                $this->pushStack();
+                $rhsType = $this->visit($ctx->unary($uIdx++));
+
+                if ($rhsType === 'float32' && ($op === '*' || $op === '/')) {
+                    // Promover lhs → float
+                    $this->emit('ldr x1, [sp]');
+                    $this->emit('add sp, sp, #16');
+                    $this->emit('scvtf s1, w1',      'lhs int32 → float32');
+                    $this->emitFloatBinaryOp($op);
+                    $type = 'float32';
+                } else {
+                    $this->emit('ldr x1, [sp]');
+                    $this->emit('add sp, sp, #16');
+                    switch ($op) {
+                        case '*': $this->emit('mul x0, x1, x0');  break;
+                        case '/': $this->emit('sdiv x0, x1, x0'); break;
+                        case '%':
+                            $this->emit('sdiv x2, x1, x0',     'cociente');
+                            $this->emit('msub x0, x2, x0, x1', 'resto = lhs - coc*rhs');
+                            break;
+                    }
+                }
             }
         }
         return $type;
@@ -192,36 +277,41 @@ trait ExpressionsTrait
     public function visitNegativeUnary($ctx)
     {
         $type = $this->visit($ctx->unary());
-        $this->emit('neg x0, x0');
+        if ($type === 'float32') {
+            $this->emit('fneg s0, s0',   'negación float32');
+        } else {
+            $this->emit('neg x0, x0',    'negación int32');
+        }
         return $type;
     }
 
     public function visitNotUnary($ctx)
     {
         $this->visit($ctx->unary());
-        $this->emit('eor x0, x0, #1',  'NOT lógico');
+        $this->emit('eor x0, x0, #1',   'NOT lógico');
         return 'bool';
     }
 
-    // ─── Punteros (Fase 3) ───────────────────────────────────────────────────
+    // ─── Punteros ────────────────────────────────────────────────────────────
 
     public function visitAddressOf($ctx)
     {
         $name = $ctx->ID()->getText();
         if ($this->func && $this->func->hasLocal($name)) {
             $offset = $this->func->getOffset($name);
-            $this->emit("sub x0, x29, #$offset",  "&$name");
+            $this->emit("sub x0, x29, #$offset",  "&$name → dirección en frame");
         } else {
-            $this->emit('mov x0, #0');
+            $this->addError('Semántico', "Variable '$name' no declarada", 0, 0);
+            $this->emit('mov x0, xzr');
         }
         return 'pointer';
     }
 
     public function visitDereference($ctx)
     {
-        $this->visit($ctx->unary());
-        $this->emit('ldr x0, [x0]',  '*deref');
-        return 'int32';
+        $type = $this->visit($ctx->unary());
+        $this->emit('ldr x0, [x0]',    '*ptr → valor');
+        return 'int32';  // Fase 2: asumimos *T donde T=int32
     }
 
     // ─── Agrupación ──────────────────────────────────────────────────────────
@@ -235,13 +325,13 @@ trait ExpressionsTrait
 
     public function visitArrayAccess($ctx)
     {
-        $this->emit('mov x0, #0');
+        $this->emit('mov x0, xzr',  'array access — Fase 3');
         return 'int32';
     }
 
     public function visitArrayLiteralExpr($ctx)
     {
-        $this->emit('mov x0, #0');
+        $this->emit('mov x0, xzr',  'array literal — Fase 3');
         return 'array';
     }
 }

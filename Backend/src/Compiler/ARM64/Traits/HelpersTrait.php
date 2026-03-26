@@ -5,24 +5,19 @@ namespace Golampi\Compiler\ARM64\Traits;
 use Golampi\Compiler\ARM64\FunctionContext;
 
 /**
- * HelpersTrait
+ * HelpersTrait — Fase 2
  *
- * Responsabilidad: utilidades de soporte usadas por múltiples traits:
- *   - Resolución de nombres de tipo
- *   - Alocación de variables en el frame
- *   - Valores por defecto
- *   - Tabla de símbolos
- *   - Reporte de errores
- *   - Visitors de identificadores y primarios simples
+ * Utilidades compartidas por múltiples traits:
+ *   - Resolución de nombres de tipo (con soporte float32)
+ *   - Alocación de variables en el frame (float en slots de 8 bytes)
+ *   - Valores por defecto (float → 0.0 con fmov)
+ *   - Tabla de símbolos y errores
+ *   - visitIdentifier: distingue int vs float para emitir ldr correcto
  */
 trait HelpersTrait
 {
     // ─── Tipos ───────────────────────────────────────────────────────────────
 
-    /**
-     * Obtiene el nombre de tipo normalizado a partir del contexto ANTLR.
-     * Arrays y punteros son marcadores para Fases 3+.
-     */
     protected function getTypeName($typeCtx): string
     {
         if ($typeCtx === null) return 'int32';
@@ -41,10 +36,6 @@ trait HelpersTrait
 
     // ─── Alocación de variables ───────────────────────────────────────────────
 
-    /**
-     * Reserva un slot en el frame de la función actual.
-     * Devuelve el offset desde fp, o null si hay error.
-     */
     protected function allocVar(string $name, string $type, int $line, int $col): ?int
     {
         if ($this->func === null) {
@@ -52,9 +43,8 @@ trait HelpersTrait
             return null;
         }
         if ($this->func->isFrameFull()) {
-            $max = FunctionContext::MAX_FRAME / 8;
             $this->addError('Semántico',
-                "Demasiadas variables en '{$this->func->name}' (máximo $max en Fase 1)",
+                "Demasiadas variables en '{$this->func->name}' (máximo en Fase 2)",
                 $line, $col);
             return null;
         }
@@ -64,29 +54,37 @@ trait HelpersTrait
     // ─── Valores por defecto ──────────────────────────────────────────────────
 
     /**
-     * Emite las instrucciones ARM64 para almacenar el valor por defecto
-     * del tipo dado en [fp - offset].
+     * Almacena el valor por defecto del tipo en [fp - offset].
+     * Fase 2: float32 → fmov s0, #0.0 + str s0
      */
     protected function storeDefault(string $type, int $offset): void
     {
         switch ($type) {
             case 'float32':
+                // 0.0 float: fmov s0, #0.0 no existe en ARM64 como inmediato.
+                // Alternativa: movi d0, #0 (pone 0 en todos los bits de d0, incluye s0)
                 $this->emit('movi d0, #0',              'float32 default = 0.0');
-                $this->emit('fmov x0, d0');
+                $this->emit("str s0, [x29, #-$offset]");
                 break;
             case 'bool':
-                $this->emit('mov x0, #0',               'bool default = false');
+                $this->emit('mov x0, xzr',              'bool default = false');
+                $this->emit("str x0, [x29, #-$offset]");
                 break;
             case 'string':
                 $empty = $this->internString('');
                 $this->emit("adrp x0, $empty",          'string default = ""');
                 $this->emit("add x0, x0, :lo12:$empty");
+                $this->emit("str x0, [x29, #-$offset]");
                 break;
-            default:   // int32, rune, nil, pointer
-                $this->emit('mov x0, #0',               "$type default = 0");
+            case 'rune':
+                $this->emit('mov x0, xzr',              "rune default = '\\0'");
+                $this->emit("str x0, [x29, #-$offset]");
+                break;
+            default:   // int32, nil, pointer
+                $this->emit('mov x0, xzr',              "$type default = 0");
+                $this->emit("str x0, [x29, #-$offset]");
                 break;
         }
-        $this->emit("str x0, [x29, #-$offset]");
     }
 
     // ─── Tabla de símbolos ────────────────────────────────────────────────────
@@ -124,8 +122,11 @@ trait HelpersTrait
     // ─── Identificadores ─────────────────────────────────────────────────────
 
     /**
-     * Carga una variable local al registro x0.
-     * Si no existe, registra un error semántico.
+     * Carga una variable local al registro correspondiente según su tipo:
+     *   - int32/bool/string/rune/pointer → x0
+     *   - float32 → s0
+     *
+     * Devuelve el tipo de la variable.
      */
     public function visitIdentifier($ctx)
     {
@@ -135,12 +136,18 @@ trait HelpersTrait
 
         if (!$this->func || !$this->func->hasLocal($name)) {
             $this->addError('Semántico', "Variable '$name' no declarada", $line, $col);
-            $this->emit('mov x0, #0');
+            $this->emit('mov x0, xzr');
             return 'int32';
         }
 
         $offset = $this->func->getOffset($name);
-        $this->emit("ldr x0, [x29, #-$offset]",  "$name");
-        return $this->func->getType($name);
+        $type   = $this->func->getType($name);
+
+        if ($type === 'float32') {
+            $this->emit("ldr s0, [x29, #-$offset]",  "$name (float32)");
+        } else {
+            $this->emit("ldr x0, [x29, #-$offset]",  "$name ($type)");
+        }
+        return $type;
     }
 }

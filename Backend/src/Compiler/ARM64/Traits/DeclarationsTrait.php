@@ -3,22 +3,24 @@
 namespace Golampi\Compiler\ARM64\Traits;
 
 /**
- * DeclarationsTrait
+ * DeclarationsTrait — Fase 2
  *
- * Responsabilidad: generar código ARM64 para declaraciones de variables
- * (var, :=, const) y el pre-escaner de bloques que pre-asigna slots
- * en el stack frame antes de generar el prólogo.
+ * Generación de código ARM64 para declaraciones:
+ *   var, :=, const
+ *
+ * Cambios Fase 2:
+ *   - storeDefault diferencia int32 vs float32
+ *   - storeExpr diferencia int32 vs float32 al momento de str
+ *   - prescanBlock reconoce float32 para asignar tipo correcto en allocLocal
  */
 trait DeclarationsTrait
 {
     // ═════════════════════════════════════════════════════════════════════
-    //  PRE-ESCANER  — recorre el AST antes del prólogo para conocer el
-    //  tamaño total del frame y emitir "sub sp, sp, #N" correctamente.
+    //  PRE-ESCANER
     // ═════════════════════════════════════════════════════════════════════
 
     protected function prescanBlock($blockCtx): void
     {
-        // Los hijos 0 y getChildCount()-1 son '{' y '}'
         for ($i = 1; $i < $blockCtx->getChildCount() - 1; $i++) {
             $child = $blockCtx->getChild($i);
             if ($child instanceof \Antlr\Antlr4\Runtime\ParserRuleContext) {
@@ -31,7 +33,6 @@ trait DeclarationsTrait
     {
         $class = get_class($ctx);
 
-        // VarDeclSimple / VarDeclWithInit → tipo conocido
         if (str_ends_with($class, 'VarDeclSimpleContext') ||
             str_ends_with($class, 'VarDeclWithInitContext')) {
             $typeCtx = $ctx->type();
@@ -40,13 +41,11 @@ trait DeclarationsTrait
             return;
         }
 
-        // ShortVarDecl → tipo se infiere después
         if (str_ends_with($class, 'ShortVarDeclContext')) {
             $this->prescanIds($ctx->idList(), 'unknown');
             return;
         }
 
-        // ConstDecl → un solo ID
         if (str_ends_with($class, 'ConstDeclContext')) {
             $name = $ctx->ID()->getText();
             if ($this->func && !$this->func->hasLocal($name)) {
@@ -57,7 +56,7 @@ trait DeclarationsTrait
             return;
         }
 
-        // Recursión: para if, for, etc. escanear sub-bloques
+        // Recursión en bloques anidados
         for ($i = 0; $i < $ctx->getChildCount(); $i++) {
             $child = $ctx->getChild($i);
             if ($child instanceof \Antlr\Antlr4\Runtime\ParserRuleContext) {
@@ -89,11 +88,10 @@ trait DeclarationsTrait
     public function visitDeclaration($ctx)  { return $this->visitChildren($ctx); }
     public function visitStatement($ctx)    { return $this->visitChildren($ctx); }
 
-    /** Las declaraciones de funciones ya se procesaron en visitProgram */
     public function visitFuncDeclSingleReturn($ctx) { return null; }
     public function visitFuncDeclMultiReturn($ctx)  { return null; }
 
-    // ─── var x int32 ──────────────────────────────────────────────────────
+    // ─── var x T ──────────────────────────────────────────────────────────
 
     public function visitVarDeclSimple($ctx)
     {
@@ -115,7 +113,7 @@ trait DeclarationsTrait
         return null;
     }
 
-    // ─── var x int32 = expr ───────────────────────────────────────────────
+    // ─── var x T = expr ───────────────────────────────────────────────────
 
     public function visitVarDeclWithInit($ctx)
     {
@@ -139,8 +137,11 @@ trait DeclarationsTrait
                 $exprCtx  = $exprList->getChild($idx * 2);
                 $this->comment("var $name $type = expr");
                 $exprType = $this->visit($exprCtx);
+
+                // Conversión automática si los tipos no coinciden
+                $exprType = $this->coerceIfNeeded($type, $exprType ?? $type);
+                $this->storeResult($type, $offset);
                 $this->func->setType($name, $exprType ?? $type);
-                $this->emit("str x0, [x29, #-$offset]");
             } else {
                 $this->storeDefault($type, $offset);
             }
@@ -173,7 +174,7 @@ trait DeclarationsTrait
 
                 $offset = $this->allocVar($name, $exprType, $line, $col);
                 if ($offset !== null) {
-                    $this->emit("str x0, [x29, #-$offset]");
+                    $this->storeResult($exprType, $offset);
                     $this->func->setType($name, $exprType);
                     $this->addSymbol($name, $exprType, $this->func->name, null, $line, $col);
                 }
@@ -183,9 +184,8 @@ trait DeclarationsTrait
         return null;
     }
 
-    // ─── const x int32 = expr ────────────────────────────────────────────
+    // ─── const x T = expr ────────────────────────────────────────────────
 
-    /** Fase 1: const se trata como variable inmutable en el stack. */
     public function visitConstDecl($ctx)
     {
         $name    = $ctx->ID()->getText();
@@ -198,10 +198,54 @@ trait DeclarationsTrait
         if ($offset === null) return null;
 
         $this->comment("const $name $type");
-        $this->visit($ctx->expression());
-        $this->emit("str x0, [x29, #-$offset]");
+        $exprType = $this->visit($ctx->expression());
+        $this->coerceIfNeeded($type, $exprType ?? $type);
+        $this->storeResult($type, $offset);
         $this->addSymbol($name, $type . ' (const)', $this->func->name, null, $line, $col);
-
         return null;
+    }
+
+    // ═════════════════════════════════════════════════════════════════════
+    //  HELPERS INTERNOS
+    // ═════════════════════════════════════════════════════════════════════
+
+    /**
+     * Almacena el resultado de una expresión (x0 o s0) en el frame.
+     * Usa str x0 para int/bool/string/rune/pointer,
+     * y str s0 para float32.
+     */
+    private function storeResult(string $type, int $offset): void
+    {
+        if ($type === 'float32') {
+            $this->emit("str s0, [x29, #-$offset]",  'guardar float32');
+        } else {
+            $this->emit("str x0, [x29, #-$offset]",  "guardar $type");
+        }
+    }
+
+    /**
+     * Conversión automática de tipo entre el tipo declarado y el tipo de la expresión.
+     * Si hay conversión, emite la instrucción y retorna el tipo final.
+     *
+     * @param string $declaredType  Tipo declarado de la variable
+     * @param string $exprType      Tipo del resultado de la expresión
+     * @return string               Tipo final tras conversión
+     */
+    private function coerceIfNeeded(string $declaredType, string $exprType): string
+    {
+        if ($declaredType === $exprType) return $exprType;
+
+        if ($declaredType === 'float32' && ($exprType === 'int32' || $exprType === 'rune')) {
+            // Promover int32 → float32
+            $this->emitIntToFloat();
+            return 'float32';
+        }
+        if ($declaredType === 'int32' && $exprType === 'float32') {
+            // Truncar float32 → int32
+            $this->emitFloatToInt();
+            return 'int32';
+        }
+        // Otros casos: sin conversión (puede ser un error semántico ignorado)
+        return $exprType;
     }
 }
