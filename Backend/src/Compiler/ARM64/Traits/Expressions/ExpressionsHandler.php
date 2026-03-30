@@ -8,11 +8,11 @@ use Golampi\Compiler\ARM64\Traits\Expressions\Comparisons;
 use Golampi\Compiler\ARM64\Traits\Expressions\ArithmeticOps;
 use Golampi\Compiler\ARM64\Traits\Expressions\UnaryOps;
 
-require_once __DIR__ . '/Expressions/ExpressionEntry.php';
-require_once __DIR__ . '/Expressions/LogicalOps.php';
-require_once __DIR__ . '/Expressions/Comparisons.php';
-require_once __DIR__ . '/Expressions/ArithmeticOps.php';
-require_once __DIR__ . '/Expressions/UnaryOps.php';
+require_once __DIR__ . '/ExpressionEntry.php';
+require_once __DIR__ . '/LogicalOps.php';
+require_once __DIR__ . '/Comparisons.php';
+require_once __DIR__ . '/ArithmeticOps.php';
+require_once __DIR__ . '/UnaryOps.php';
 
 /**
  * ExpressionsTrait — Orquestador de la fase de generación de expresiones

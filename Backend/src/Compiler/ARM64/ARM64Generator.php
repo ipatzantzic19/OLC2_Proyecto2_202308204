@@ -3,35 +3,42 @@
 namespace Golampi\Compiler\ARM64;
 
 use Golampi\Compiler\CompilationResult;
-use Golampi\Compiler\ARM64\Traits\EmitterTrait;
-use Golampi\Compiler\ARM64\Traits\StringPoolTrait;
-use Golampi\Compiler\ARM64\Traits\FloatOpsTrait;
-use Golampi\Compiler\ARM64\Traits\StringOpsTrait;
-use Golampi\Compiler\ARM64\Traits\DeclarationsTrait;
-use Golampi\Compiler\ARM64\Traits\AssignmentsTrait;
-use Golampi\Compiler\ARM64\Traits\ControlFlowTrait;
-use Golampi\Compiler\ARM64\Traits\ExpressionsTrait;
-use Golampi\Compiler\ARM64\Traits\LiteralsTrait;
-use Golampi\Compiler\ARM64\Traits\FunctionCallTrait;
-use Golampi\Compiler\ARM64\Traits\HelpersTrait;
+use Golampi\Compiler\ARM64\Traits\Emitter\EmitterHandler;
+use Golampi\Compiler\ARM64\Traits\StringPool\StringPoolHandler;
+use Golampi\Compiler\ARM64\Traits\FloatOps\FloatHandler;
+use Golampi\Compiler\ARM64\Traits\StringOps\StringOpsHandler;
+use Golampi\Compiler\ARM64\Traits\Declarations\DeclHandler;
+use Golampi\Compiler\ARM64\Traits\Assignments\AssignmentsHandler;
+use Golampi\Compiler\ARM64\Traits\ControlFlow\ControlFlowHandler;
+use Golampi\Compiler\ARM64\Traits\Expressions\ExpressionsHandler;
+use Golampi\Compiler\ARM64\Traits\Literals\LiteralsHandler;
+use Golampi\Compiler\ARM64\Traits\FunctionCall\FunctionCallHandler;
+use Golampi\Compiler\ARM64\Traits\Helpers\HelpersHandler;
+use Golampi\Compiler\ARM64\Traits\Phases\GeneratorPhaseHandler;
 
 require_once __DIR__ . '/../../../generated/GolampiVisitor.php';
 require_once __DIR__ . '/../../../generated/GolampiBaseVisitor.php';
 
 // ── Traits de nivel superior (orquestadores) ──────────────────────────────────
-require_once __DIR__ . '/Traits/EmitterTrait.php';
-require_once __DIR__ . '/Traits/StringPoolTrait.php';
-require_once __DIR__ . '/Traits/FloatOpsTrait.php';
-require_once __DIR__ . '/Traits/StringOpsTrait.php';
-require_once __DIR__ . '/Traits/LiteralsTrait.php';
-require_once __DIR__ . '/Traits/AssignmentsTrait.php';
-require_once __DIR__ . '/Traits/FunctionCallTrait.php';
-require_once __DIR__ . '/Traits/HelpersTrait.php';
+require_once __DIR__ . '/Traits/Emitter/EmitterHandler.php';
+require_once __DIR__ . '/Traits/StringPool/StringPoolHandler.php';
+require_once __DIR__ . '/Traits/FloatOps/FloatHandler.php';
+require_once __DIR__ . '/Traits/StringOps/StringOpsHandler.php';
+require_once __DIR__ . '/Traits/Literals/LiteralsHandler.php';
+require_once __DIR__ . '/Traits/Assignments/AssignmentsHandler.php';
+require_once __DIR__ . '/Traits/FunctionCall/FunctionCallHandler.php';
+require_once __DIR__ . '/Traits/Helpers/HelpersHandler.php';
 
 // ── Orquestadores con sub-traits (los require_once internos los cargan) ───────
-require_once __DIR__ . '/Traits/ControlFlowTrait.php';
-require_once __DIR__ . '/Traits/DeclarationsTrait.php';
-require_once __DIR__ . '/Traits/ExpressionsTrait.php';
+require_once __DIR__ . '/Traits/ControlFlow/ControlFlowHandler.php';
+require_once __DIR__ . '/Traits/Declarations/DeclHandler.php';
+require_once __DIR__ . '/Traits/Expressions/ExpressionsHandler.php';
+
+// ── Nuevo sistema de fases (separación arquitectónica) ──────────────────────
+require_once __DIR__ . '/Traits/Phases/PrescanPhase.php';
+require_once __DIR__ . '/Traits/Phases/GenerationPhase.php';
+require_once __DIR__ . '/Traits/Phases/ProgramPhase.php';
+require_once __DIR__ . '/Traits/Phases/GeneratorPhaseHandler.php';
 
 /**
  * ARM64Generator — Generador de código ensamblador ARM64 (AArch64)
@@ -44,38 +51,71 @@ require_once __DIR__ . '/Traits/ExpressionsTrait.php';
  *  ARQUITECTURA DE TRAITS (organización modular)
  * ═══════════════════════════════════════════════════════════════════════════
  *
- * Traits de infraestructura (sin subcarpeta):
- *   EmitterTrait        → emit(), label(), comment(), buildAssembly()
- *   StringPoolTrait     → internString(), asmEscape()
- *   FloatOpsTrait       → internFloat(), fadd/fsub/fmul, conversiones int↔float
- *   StringOpsTrait      → golampi_concat, strlen, substr, now, typeOf
- *   LiteralsTrait       → visitIntLiteral, visitFloatLiteral, visitRune, etc.
- *   AssignmentsTrait    → visitSimpleAssignment, visitArrayAssignment, ++, --
- *   FunctionCallTrait   → fmt.Println, funciones usuario (multi-param), builtins
- *   HelpersTrait        → getTypeName, allocVar, storeDefault, addSymbol, visitIdentifier
+ * Todos los traits están organizados como orquestadores con sub-traits:
  *
- * Traits orquestadores (con subcarpeta de sub-traits especializados):
+ *   EmitterHandler ← orquesta:
+ *     Emitter/InstructionEmitter  → emit(), label(), comment(), newLabel(), pushStack(), emitBinaryOp()
+ *     Emitter/AssemblyBuilder     → buildAssembly()
  *
- *   ControlFlowTrait  ← orquesta:
- *     ControlFlow/ForClassicTrait    → for init ; cond ; post { }
- *     ControlFlow/ForWhileTrait      → for cond { }
- *     ControlFlow/ForInfiniteTrait   → for { }
- *     ControlFlow/IfTrait            → if / else if / else
- *     ControlFlow/SwitchTrait        → switch / case / default
- *     ControlFlow/TransferTrait      → break / continue / return
+ *   StringPoolHandler ← orquesta:
+ *     StringPool/PoolTrait        → internString(), asmEscape()
  *
- *   DeclarationsTrait ← orquesta:
- *     Declarations/PrescanTrait      → pasada 1: registrar variables antes de generar
- *     Declarations/VarDeclTrait      → var x T  /  var x T = expr
- *     Declarations/ShortVarDeclTrait → x := expr (tipo inferido)
- *     Declarations/ConstDeclTrait    → const x T = expr
+ *   FloatHandler ← orquesta:
+ *     FloatOps/FloatArithmetic    → fadd, fsub, fmul, fdiv con promoción de tipos
+ *     FloatOps/FloatComparison    → comparaciones de floats (== != > >= < <=)
+ *     FloatOps/FloatPool          → internFloat() para literales float
  *
- *   ExpressionsTrait  ← orquesta:
- *     Expressions/ExpressionEntryTrait → visitExpression (punto de entrada)
- *     Expressions/LogicalOpsTrait      → ||, && con cortocircuito
- *     Expressions/ComparisonsTrait     → ==, !=, >, >=, <, <=
- *     Expressions/ArithmeticOpsTrait   → +, -, *, /, % con promoción de tipos
- *     Expressions/UnaryOpsTrait        → -, !, &, *, (expr), array access
+ *   LiteralsHandler ← orquesta:
+ *     Literals/IntLiteral         → visitIntLiteral()
+ *     Literals/FloatLiteral       → visitFloatLiteral()
+ *     Literals/RuneLiteral        → visitRune()
+ *     Literals/StringLiteral      → visitStringLiteral()
+ *     Literals/ScalarLiteral      → visitScalarLiteral()
+ *
+ *   AssignmentsHandler ← orquesta:
+ *     Assignments/SimpleAssignment       → asignaciones simples (x = expr)
+ *     Assignments/ArrayAssignment        → asignaciones a arrays (a[i] = expr)
+ *     Assignments/PointerAssignment      → asignaciones a punteros (*p = expr)
+ *     Assignments/IncrementDecrement     → ++, -- (pre y post)
+ *
+ *   StringOpsHandler ← orquesta:
+ *     StringOps/ConcatHelper      → emitStringConcat() + golampi_concat helper
+ *     StringOps/StringLenHelper   → emitStrlen()
+ *     StringOps/SubstrHelper      → emitSubstr() + golampi_substr helper
+ *     StringOps/NowHelper         → emitNow() + golampi_now helper
+ *     StringOps/TypeOfHelper      → emitTypeOf()
+ *
+ *   FunctionCallHandler ← orquesta:
+ *     FunctionCall/PrintlnCall    → fmt.Println()
+ *     FunctionCall/BuiltinCall    → funciones built-in (len, append, etc.)
+ *     FunctionCall/UserFunctionCall → llamadas a funciones usuario (con multi-retorno)
+ *
+ *   HelpersHandler ← orquesta:
+ *     Helpers/SymbolManager       → allocVar(), addSymbol(), visitIdentifier()
+ *     Helpers/TypeResolver        → getTypeName(), tipo de expresiones
+ *     Helpers/FrameAllocator      → cálculo de frame size
+ *     Helpers/IdentifierVisitor   → resolución de identificadores
+ *
+ *   ControlFlowHandler ← orquesta:
+ *     ControlFlow/ForClassic      → for init ; cond ; post { }
+ *     ControlFlow/ForWhile        → for cond { }
+ *     ControlFlow/ForInfinite     → for { }
+ *     ControlFlow/Condition       → if / else if / else
+ *     ControlFlow/SwitchCase      → switch / case / default
+ *     ControlFlow/Transfer        → break / continue / return
+ *
+ *   DeclHandler ← orquesta:
+ *     Declarations/Prescan        → pasada 1: registrar variables
+ *     Declarations/VarDecl        → var x T  /  var x T = expr
+ *     Declarations/ShortVarDecl   → x := expr (tipo inferido)
+ *     Declarations/ConstDecl      → const x T = expr
+ *
+ *   ExpressionsHandler ← orquesta:
+ *     Expressions/ExpressionEntry → visitExpression (punto de entrada)
+ *     Expressions/LogicalOps      → ||, && con cortocircuito
+ *     Expressions/Comparisons     → ==, !=, >, >=, <, <=
+ *     Expressions/ArithmeticOps   → +, -, *, /, % con promoción tipos
+ *     Expressions/UnaryOps        → -, !, &, *, (expr), array access
  *
  * ═══════════════════════════════════════════════════════════════════════════
  *  REGISTRO DE ACTIVACIÓN (stack frame por función)
@@ -118,19 +158,22 @@ require_once __DIR__ . '/Traits/ExpressionsTrait.php';
 class ARM64Generator extends \GolampiBaseVisitor
 {
     // ── Traits de infraestructura ─────────────────────────────────────────
-    use EmitterTrait;
-    use StringPoolTrait;
-    use FloatOpsTrait;
-    use StringOpsTrait;
-    use LiteralsTrait;
-    use AssignmentsTrait;
-    use FunctionCallTrait;
-    use HelpersTrait;
+    use EmitterHandler;
+    use StringPoolHandler;
+    use FloatHandler;
+    use StringOpsHandler;
+    use LiteralsHandler;
+    use AssignmentsHandler;
+    use FunctionCallHandler;
+    use HelpersHandler;
 
     // ── Traits orquestadores (cada uno importa sus sub-traits) ────────────
-    use ControlFlowTrait;    // ForClassic + ForWhile + ForInfinite + If + Switch + Transfer
-    use DeclarationsTrait;   // Prescan + VarDecl + ShortVarDecl + ConstDecl
-    use ExpressionsTrait;    // Entry + Logical + Comparisons + Arithmetic + Unary
+    use ControlFlowHandler;  // ForClassic + ForWhile + ForInfinite + If + Switch + Transfer
+    use DeclHandler;         // Prescan + VarDecl + ShortVarDecl + ConstDecl
+    use ExpressionsHandler;  // Entry + Logical + Comparisons + Arithmetic + Unary
+
+    // ── Nuevo sistema de fases (organización arquitectónica por pasada) ───
+    use GeneratorPhaseHandler;  // PrescanPhase + GenerationPhase + ProgramPhase
 
     // ═══════════════════════════════════════════════════════════════════════
     //  ESTADO DEL GENERADOR
@@ -169,6 +212,9 @@ class ARM64Generator extends \GolampiBaseVisitor
     private bool $concatHelperEmitted = false;
     private bool $substrHelperEmitted = false;
     private bool $nowHelperEmitted    = false;
+
+    // ── Helpers generados (para ProgramPhase) ────────────────────────────
+    protected array $generatedHelpers = [];  // ['concat' => true, 'substr' => true, 'now' => true]
 
     // ═══════════════════════════════════════════════════════════════════════
     //  API PÚBLICA

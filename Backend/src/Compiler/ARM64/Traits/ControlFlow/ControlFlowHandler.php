@@ -9,12 +9,12 @@ use Golampi\Compiler\ARM64\Traits\ControlFlow\Condition;
 use Golampi\Compiler\ARM64\Traits\ControlFlow\SwitchCase;
 use Golampi\Compiler\ARM64\Traits\ControlFlow\Transfer;
 
-require_once __DIR__ . '/ControlFlow/ForClassic.php';
-require_once __DIR__ . '/ControlFlow/ForWhile.php';
-require_once __DIR__ . '/ControlFlow/ForInfinite.php';
-require_once __DIR__ . '/ControlFlow/Condition.php';
-require_once __DIR__ . '/ControlFlow/SwitchCase.php';
-require_once __DIR__ . '/ControlFlow/Transfer.php';
+require_once __DIR__ . '/ForClassic.php';
+require_once __DIR__ . '/ForWhile.php';
+require_once __DIR__ . '/ForInfinite.php';
+require_once __DIR__ . '/Condition.php';
+require_once __DIR__ . '/SwitchCase.php';
+require_once __DIR__ . '/Transfer.php';
 
 /**
  * ControlFlowTrait — Orquestador del control de flujo ARM64

@@ -87,7 +87,7 @@ trait ArithmeticOps
         }
 
         if ($lhsType === 'string' && $op === '+') {
-            return $this->emitStringConcat($rhsCtx);
+            return $this->emitStringConcatenationExpr($rhsCtx);
         }
 
         // int32 / rune: verificar si rhs es float → promover
@@ -179,8 +179,10 @@ trait ArithmeticOps
     /**
      * Genera concatenación de strings con el helper golampi_concat.
      * Precondición: lhs (string ptr) ya evaluado.
+     * Nota: Se llama desde visitAdditive cuando se detecta operación string + string.
+     * El helper golampi_concat se garantiza a través de StringOpsHandler::ensureConcatHelper.
      */
-    private function emitStringConcat($rhsCtx): string
+    private function emitStringConcatenationExpr($rhsCtx): string
     {
         $this->pushStack();               // lhs ptr → stack
         $this->visit($rhsCtx);           // rhs → x0

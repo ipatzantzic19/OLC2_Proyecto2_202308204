@@ -34,7 +34,7 @@ require_once __DIR__ . '/AssemblyBuilder.php';
  *   array $postTextLines  → buffer de helpers de runtime
  *   int   $labelIdx       → contador global de etiquetas únicas
  */
-trait EmmiterHandler
+trait EmitterHandler
 {
     use InstructionEmitter; // emit, label, comment, newLabel, pushStack, emitBinaryOp
     use AssemblyBuilder;    // buildAssembly

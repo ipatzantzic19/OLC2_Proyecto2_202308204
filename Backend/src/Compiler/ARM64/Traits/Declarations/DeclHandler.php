@@ -7,10 +7,10 @@ use Golampi\Compiler\ARM64\Traits\Declarations\VarDecl;
 use Golampi\Compiler\ARM64\Traits\Declarations\ShortVarDecl;
 use Golampi\Compiler\ARM64\Traits\Declarations\ConstDecl;
 
-require_once __DIR__ . '/Declarations/Prescan.php';
-require_once __DIR__ . '/Declarations/VarDecl.php';
-require_once __DIR__ . '/Declarations/ShortVarDecl.php';
-require_once __DIR__ . '/Declarations/ConstDecl.php';
+require_once __DIR__ . '/Prescan.php';
+require_once __DIR__ . '/VarDecl.php';
+require_once __DIR__ . '/ShortVarDecl.php';
+require_once __DIR__ . '/ConstDecl.php';
 
 /**
  * DeclHandler — Orquestador de la fase de declaraciones
