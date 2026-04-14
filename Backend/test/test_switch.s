@@ -14,10 +14,10 @@
 .str_4: .string "%s"
 
 .section .text
-.global main
+.global _start
 
 
-main:
+_start:
 	# ── función main ── registro de activación ──
 	stp x29, x30, [sp, #-16]!                  # guardar fp (enlace control) y lr
 	mov x29, sp                                # establecer frame pointer
@@ -108,7 +108,7 @@ main:
 	adrp x0, .str_1
 	add x0, x0, :lo12:.str_1
 	bl printf
-.epilogue_main:
+.epilogue__start:
 	# ── epílogo main ──
 	add sp, sp, #16                            # liberar espacio de locales
 	ldp x29, x30, [sp], #16                    # restaurar fp y lr

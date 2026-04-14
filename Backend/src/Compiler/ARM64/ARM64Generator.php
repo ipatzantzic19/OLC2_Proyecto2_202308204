@@ -330,13 +330,15 @@ class ARM64Generator extends \GolampiBaseVisitor
             $this->prescanBlock($funcDecl->block());
         }
 
-        $epilogueLabel             = '.epilogue_' . $name;
+        // Renombrar main → _start conforme a ARM64 (enunciado sección 3.4.7)
+        $labelName                 = ($name === 'main') ? '_start' : $name;
+        $epilogueLabel             = '.epilogue_' . $labelName;
         $this->func->epilogueLabel = $epilogueLabel;
         $frameSize                 = $this->func->getFrameSize();
 
-        // ── Prólogo ARM64 ─────────────────────────────────────────────────
+        // ── Prólogo ARM64 ────────────────────────────────────────────
         $this->textLines[] = '';
-        $this->label($name);
+        $this->label($labelName);
         $this->comment("── función $name ── registro de activación ──");
         $this->emit('stp x29, x30, [sp, #-16]!', 'guardar fp (enlace control) y lr');
         $this->emit('mov x29, sp',                'establecer frame pointer');
@@ -372,7 +374,7 @@ class ARM64Generator extends \GolampiBaseVisitor
             $this->emit("add sp, sp, #$frameSize", 'liberar espacio de locales');
         }
         $this->emit('ldp x29, x30, [sp], #16', 'restaurar fp y lr');
-        if ($name === 'main') {
+        if ($name === '_start' || $name === 'main') {
             $this->emit('mov x0, #0', 'exit code 0');
         }
         $this->emit('ret');
