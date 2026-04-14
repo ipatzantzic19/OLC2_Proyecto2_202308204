@@ -53,19 +53,17 @@ trait AssemblyBuilder
         $lines = [];
 
         // ── Cabecera ──────────────────────────────────────────────────────
-        $lines[] = '// ============================================================';
-        $lines[] = '// Golampi Compiler — Fase 2 — ARM64 (AArch64)';
-        $lines[] = '// Compilar:';
-        $lines[] = '//   aarch64-linux-gnu-gcc -o programa program.s -lc';
-        $lines[] = '// Ejecutar:';
-        $lines[] = '//   qemu-aarch64 -L /usr/aarch64-linux-gnu ./programa';
-        $lines[] = '// ============================================================';
-        $lines[] = '.arch armv8-a';
+        $lines[] = '# ============================================================';
+        $lines[] = '# Golampi Compiler — Fase 2 — ARM64 (AArch64)';
+        $lines[] = '# Compilar:';
+        $lines[] = '#   aarch64-linux-gnu-gcc -o programa program.s -lc';
+        $lines[] = '# Ejecutar:';
+        $lines[] = '#   qemu-aarch64 -L /usr/aarch64-linux-gnu ./programa';
+        $lines[] = '# ============================================================';
         $lines[] = '';
 
         // ── Sección .data ─────────────────────────────────────────────────
         if (!empty($this->dataLines)) {
-            $lines[] = '.section __DATA,__data';
             $lines[] = '.section .data';
             foreach ($this->dataLines as $l) {
                 $lines[] = $l;
@@ -84,7 +82,7 @@ trait AssemblyBuilder
         // ── Helpers de runtime ────────────────────────────────────────────
         if (!empty($this->postTextLines)) {
             $lines[] = '';
-            $lines[] = '// ── Runtime helpers Golampi ─────────────────────────────────';
+            $lines[] = '# ── Runtime helpers Golampi ─────────────────────────────────';
             foreach ($this->postTextLines as $block) {
                 foreach (explode("\n", $block) as $line) {
                     $lines[] = $line;

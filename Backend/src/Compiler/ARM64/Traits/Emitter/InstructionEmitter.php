@@ -31,7 +31,7 @@ trait InstructionEmitter
         $line = "\t" . $instr;
         if ($comment !== '') {
             $padding = max(1, 44 - strlen($line));
-            $line   .= str_repeat(' ', $padding) . '// ' . $comment;
+            $line   .= str_repeat(' ', $padding) . '# ' . $comment;
         }
         $this->textLines[] = $line;
     }
@@ -42,10 +42,10 @@ trait InstructionEmitter
         $this->textLines[] = $name . ':';
     }
 
-    /** Emite un comentario indentado (// texto). */
+    /** Emite un comentario indentado (# texto). */
     protected function comment(string $text): void
     {
-        $this->textLines[] = "\t// " . $text;
+        $this->textLines[] = "\t# " . $text;
     }
 
     /** Añade una línea cruda a la sección .data. */

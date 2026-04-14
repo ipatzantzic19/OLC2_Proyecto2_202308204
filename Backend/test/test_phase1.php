@@ -554,7 +554,7 @@ func main() {
 }
 GO, [
     'no_errors'    => true,
-    'asm_contains' => ['.section __DATA', 'alpha', 'beta'],
+    'asm_contains' => ['.section .data', 'alpha', 'beta'],
 ]);
 
 test('strings idénticos → mismo label (no duplicados)', <<<'GO'

@@ -48,17 +48,28 @@
   }
 
   function highlightOps(ops) {
-    // Highlight registers (x0-x30, w0-w30, sp, fp, lr, d0-d31, s0-s31)
-    return esc(ops).replace(
+    // Escape first to prevent HTML injection
+    let escaped = esc(ops);
+    
+    // Highlight registers - no escape needed for captured group since it's only alphanumeric
+    escaped = escaped.replace(
       /\b(x[0-9]{1,2}|w[0-9]{1,2}|sp|fp|lr|xzr|wzr|d[0-9]{1,2}|s[0-9]{1,2})\b/g,
       '<span class="asm-register">$1</span>'
-    ).replace(
+    );
+    
+    // Highlight immediates
+    escaped = escaped.replace(
       /(#-?[0-9]+)/g,
       '<span class="asm-immediate">$1</span>'
-    ).replace(
-      /("([^"]*)")/g,
+    );
+    
+    // Highlight strings (already escaped in 'escaped' variable)
+    escaped = escaped.replace(
+      /(&quot;[^&]*&quot;)/g,
       '<span class="asm-string">$1</span>'
     );
+    
+    return escaped;
   }
 
   function esc(s) {

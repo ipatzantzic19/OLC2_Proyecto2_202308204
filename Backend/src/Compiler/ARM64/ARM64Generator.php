@@ -40,6 +40,12 @@ require_once __DIR__ . '/Traits/Phases/GenerationPhase.php';
 require_once __DIR__ . '/Traits/Phases/ProgramPhase.php';
 require_once __DIR__ . '/Traits/Phases/GeneratorPhaseHandler.php';
 
+// ── Módulo de asignación de registros (AHU Cap. 8-9) ────────────────────────
+require_once __DIR__ . '/Traits/RegisterAllocation/LivenessAnalysis.php';
+require_once __DIR__ . '/Traits/RegisterAllocation/InterferenceGraph.php';
+require_once __DIR__ . '/Traits/RegisterAllocation/GraphColoring.php';
+require_once __DIR__ . '/Traits/RegisterAllocation/RegisterAllocator.php';
+
 /**
  * ARM64Generator — Generador de código ensamblador ARM64 (AArch64)
  *
@@ -174,6 +180,9 @@ class ARM64Generator extends \GolampiBaseVisitor
 
     // ── Nuevo sistema de fases (organización arquitectónica por pasada) ───
     use GeneratorPhaseHandler;  // PrescanPhase + GenerationPhase + ProgramPhase
+
+    // ── Asignación optimizada de registros (AHU Cap. 8-9) ─────────────────
+    use \Golampi\Compiler\ARM64\Traits\RegisterAllocation\RegisterAllocator;
 
     // ═══════════════════════════════════════════════════════════════════════
     //  ESTADO DEL GENERADOR

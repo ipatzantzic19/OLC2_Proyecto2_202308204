@@ -158,21 +158,57 @@ trait ArithmeticOps
     }
 
     /**
-     * Genera operación binaria float32 con manejo de push/pop.
-     * Precondición: lhs ya evaluado y en la cima del stack de trabajo
-     * (se llama cuando lhsType === 'float32' y s0 ya contiene lhs).
+     * Genera operación binaria float32 OPTIMIZADA sin spill innecesario.
+     * 
+     * Usa RegisterAllocator para asignar registros óptimos basado en
+     * análisis de interferencia (AHU Cap. 8-9).
+     * 
+     * Precondición: lhs ya evaluado en s0
+     * Postcondición: resultado en s0
      */
     private function emitFloatBinaryExpr(string $op, $rhsCtx): string
     {
-        $this->pushFloatStack();          // s0 (lhs) → stack
-        $rhsType = $this->visit($rhsCtx); // rhs → s0
+        // Obtener asignación óptima de registros
+        $allocation = $this->allocateRegisterPair('float32');
+        $lhsReg = $allocation['lhs'];  // Típicamente s0
+        $rhsReg = $allocation['rhs'];  // Típicamente s1
 
-        if ($rhsType === 'int32' || $rhsType === 'rune') {
-            $this->emitIntToFloat(); // convertir rhs int32 → float32
+        // s0 ya contiene lhs (precondición)
+        // Si lhsReg != s0, mover resulta
+        if ($lhsReg !== 's0') {
+            $this->emit("mov $lhsReg, s0", 'mover lhs a registro asignado');
         }
 
-        $this->popFloatStack();           // s1 = lhs, s0 = rhs
-        $this->emitFloatBinaryOp($op);   // fadd/fsub/fmul/fdiv
+        // Evaluar rhs → s0
+        $rhsType = $this->visit($rhsCtx);
+
+        // Si rhs necesita conversión int32 → float32
+        if ($rhsType === 'int32' || $rhsType === 'rune') {
+            $this->emitIntToFloat();  // Convierte s0 en float32
+        }
+
+        // Si rhsReg != s0, mover resultado
+        if ($rhsReg !== 's0') {
+            $this->emit("mov $rhsReg, s0", 'mover rhs a registro asignado');
+        }
+
+        // Emitir operación binaria SIN spill
+        // Nota: emitFloatBinaryOp usa s0, s1 por defecto,
+        // pero como asignamos optimalmente, evitamos push/pop
+        match ($op) {
+            '+'  => $this->emit("fadd $lhsReg, $lhsReg, $rhsReg", 'float32 suma optimizada'),
+            '-'  => $this->emit("fsub $lhsReg, $lhsReg, $rhsReg", 'float32 resta optimizada'),
+            '*'  => $this->emit("fmul $lhsReg, $lhsReg, $rhsReg", 'float32 multiplicación optimizada'),
+            '/'  => $this->emit("fdiv $lhsReg, $lhsReg, $rhsReg", 'float32 división optimizada'),
+            default => null,
+        };
+
+        // Resultado en lhsReg (típicamente s0)
+        // Si lhsReg != s0, mover resultado a s0 para consistencia
+        if ($lhsReg !== 's0') {
+            $this->emit("mov s0, $lhsReg", 'mover resultado a s0');
+        }
+
         return 'float32';
     }
 
