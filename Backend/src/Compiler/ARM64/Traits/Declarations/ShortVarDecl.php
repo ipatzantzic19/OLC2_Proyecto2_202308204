@@ -3,31 +3,54 @@
 namespace Golampi\Compiler\ARM64\Traits\Declarations;
 
 /**
- * ShortVarDeclTrait — Generación ARM64 para declaración corta de variables
+ * ShortVarDecl — Generación ARM64 para declaración corta de variables
  *
- * Soporta la sintaxis:  x := expr   y   x, y := expr1, expr2
+ * FIX FASE 2: soporta asignación multi-return:  q, r := divmod(10, 3)
  *
- * La declaración corta es la forma idiomática en Golampi/Go de declarar
- * una variable infiriendo su tipo desde la expresión del lado derecho.
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  CASOS SOPORTADOS
+ * ═══════════════════════════════════════════════════════════════════════════
  *
- * Diferencias respecto a `var x T = expr`:
- *   - No se especifica el tipo explícitamente → se infiere del resultado
- *   - Solo es válida dentro de bloques (no a nivel global)
- *   - Al menos una variable debe ser nueva en el scope actual
+ *   Caso A — Asignación 1:1          x := expr
+ *   Caso B — Asignación múltiple     a, b := e1, e2
+ *   Caso C — Multi-return            q, r := divmod(10, 3)   ← FIX
  *
- * El tipo inferido lo devuelve el visitor de la expresión (string PHP:
- * 'int32', 'float32', 'bool', 'string', 'rune', etc.).
+ *   El Caso C se distingue del Caso B porque:
+ *     • idCount  = 2  (N variables)
+ *     • exprCount = 1  (UNA expresión que retorna tipo 'multi')
  *
- * Proceso de generación:
- *   1. Evaluar expr → resultado en x0 (int) o s0 (float32)
- *   2. El tipo retornado por visit() determina cómo almacenar el resultado
- *   3. allocVar registra el slot en FunctionContext con el tipo correcto
- *   4. str x0/s0 → [x29, #-offset]
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  GENERACIÓN ARM64 PARA MULTI-RETURN (Caso C)
+ * ═══════════════════════════════════════════════════════════════════════════
  *
- * Múltiple asignación:  a, b := expr1, expr2
- *   Evalúa expr1 → guarda en a
- *   Evalúa expr2 → guarda en b
- *   (orden secuencial, no paralelo como en Go)
+ *   q, r := divmod(10, 3)
+ *
+ *   1. bl divmod          → x0 = cociente, x1 = resto  (convención AArch64)
+ *   2. sub sp, sp, #16
+ *      str x1, [sp]       → preservar x1 antes de que str x0 lo pise (no lo pisa,
+ *                            pero sp puede cambiar si allocVar re-emite instrucciones)
+ *   3. str x0, [x29, #-offset_q]   → guardar primer retorno en q
+ *   4. ldr x1, [sp]
+ *      add sp, sp, #16
+ *   5. str x1, [x29, #-offset_r]   → guardar segundo retorno en r
+ *
+ *   Invariante: el prescan (Prescan.php) ya asignó slots para q y r con
+ *   tipo 'unknown'. allocVar() devuelve el offset existente y actualiza
+ *   el tipo a 'int32' (o el tipo inferido correcto).
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ *  INFERENCIA DE TIPOS MULTI-RETURN
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ *   UserFunctionCall::inferReturnType() devuelve 'multi' cuando la función
+ *   tiene FuncDeclMultiReturnContext (declaración con typeList).
+ *
+ *   Tipos asumidos por el proyecto para multi-return:
+ *     • todos los valores van en registros enteros (x0, x1, ...)
+ *     • float32 en s0, s1, ... (extensión futura)
+ *
+ *   Para este alcance se asume tipo 'int32' en los retornos adicionales,
+ *   que es correcto para el caso canónico (int32, bool).
  */
 trait ShortVarDecl
 {
@@ -38,46 +61,161 @@ trait ShortVarDecl
         $line     = $ctx->getStart()->getLine();
         $col      = $ctx->getStart()->getCharPositionInLine();
 
-        // Contar expresiones disponibles
-        $exprCount = 0;
-        for ($i = 0; $i < $exprList->getChildCount(); $i += 2) $exprCount++;
-
-        $idx = 0;
+        // ── Recolectar IDs ────────────────────────────────────────────────
+        $ids = [];
         for ($i = 0; $i < $idList->getChildCount(); $i += 2) {
-            $name = $idList->getChild($i)->getText();
+            $ids[] = $idList->getChild($i)->getText();
+        }
+        $idCount = count($ids);
 
-            if ($idx < $exprCount) {
-                $exprCtx  = $exprList->getChild($idx * 2);
+        // ── Recolectar nodos de expresión ────────────────────────────────
+        // Los separadores ',' son TerminalNodes en índices impares.
+        $exprNodes = [];
+        for ($i = 0; $i < $exprList->getChildCount(); $i += 2) {
+            $exprNodes[] = $exprList->getChild($i);
+        }
+        $exprCount = count($exprNodes);
+
+        // ── Caso C: multi-return  (N ids, 1 expresión) ───────────────────
+        // Detección: más identificadores que expresiones → posible multi-return.
+        // Confirmación: el tipo retornado por visit() es 'multi'.
+        if ($idCount > 1 && $exprCount === 1) {
+            return $this->handleMultiReturn($ids, $exprNodes[0], $line, $col);
+        }
+
+        // ── Casos A y B: asignación normal 1:1 ───────────────────────────
+        for ($i = 0; $i < $idCount; $i++) {
+            $name = $ids[$i];
+
+            if ($i < $exprCount) {
                 $this->comment("$name := expr (tipo inferido)");
+                $exprType = $this->visit($exprNodes[$i]) ?? 'int32';
 
-                // Evaluar expresión → resultado en x0 o s0
-                $exprType = $this->visit($exprCtx) ?? 'int32';
-
-                // Registrar la variable con el tipo inferido
                 $offset = $this->allocVar($name, $exprType, $line, $col);
                 if ($offset !== null) {
                     $this->storeInferredResult($exprType, $offset);
                     $this->func->setType($name, $exprType);
-                    $this->addSymbol($name, $exprType, $this->func->name, null, $line, $col);
+                    $this->addSymbol($name, $exprType,
+                        $this->func->name, null, $line, $col);
                 }
             }
-            $idx++;
+            // Si hay más ids que exprs y no es multi-return, los ids
+            // sobrantes quedan con el valor por defecto que asignó el prescan.
         }
+
         return null;
     }
 
-    // ── Helper ────────────────────────────────────────────────────────────
+    // ── Handler de multi-return ───────────────────────────────────────────
 
     /**
-     * Almacena el resultado en el frame usando el registro correcto
-     * según el tipo inferido de la expresión.
+     * Genera código para:  q, r := funcMultiRetorno(args...)
+     *
+     * Tras `bl funcName`, la convención AArch64 deja:
+     *   x0 = primer  valor de retorno  (int / bool / rune / string)
+     *   x1 = segundo valor de retorno
+     *
+     * Se preserva x1 en el stack mientras se almacena x0, luego se
+     * recupera x1 y se almacena en el segundo slot del frame.
+     *
+     * @param string[] $ids      Lista de identificadores del lado izquierdo
+     * @param mixed    $exprCtx  Nodo de la expresión (llamada a función)
+     * @param int      $line     Línea para reporte de errores
+     * @param int      $col      Columna para reporte de errores
+     */
+    private function handleMultiReturn(
+        array $ids,
+        $exprCtx,
+        int $line,
+        int $col
+    ): ?string {
+        $this->comment('multi-asignación := (función multi-retorno)');
+
+        // Evaluar la expresión → bl funcName → x0=val0, x1=val1
+        $returnType = $this->visit($exprCtx) ?? 'int32';
+
+        // Verificar que realmente es multi-return
+        if ($returnType !== 'multi') {
+            // No es multi-return: asignar solo el primer id con el resultado en x0
+            $this->comment("(retorno simple inferido como '$returnType')");
+            $offset0 = $this->allocVar($ids[0], $returnType, $line, $col);
+            if ($offset0 !== null) {
+                $this->storeInferredResult($returnType, $offset0);
+                $this->func->setType($ids[0], $returnType);
+                $this->addSymbol($ids[0], $returnType,
+                    $this->func->name, null, $line, $col);
+            }
+            return null;
+        }
+
+        // ── Convención AArch64 multi-return ──────────────────────────────
+        // Tras bl:  x0 = primer retorno, x1 = segundo retorno
+        //
+        // Estrategia (Aho et al. — descriptores de dirección):
+        //   1. Preservar x1 (segundo retorno) en slot temporal del stack.
+        //   2. Guardar x0 en el frame slot de ids[0].
+        //   3. Recuperar x1 del stack.
+        //   4. Guardar x1 en el frame slot de ids[1].
+
+        $this->comment('preservar segundo retorno (x1) mientras se guarda x0');
+        $this->emit('sub sp, sp, #16',  'slot temporal para x1');
+        $this->emit('str x1, [sp]',     'x1 (segundo retorno) → stack');
+
+        // Guardar primer retorno → ids[0]
+        $type0   = 'int32'; // primer retorno: siempre entero en la convención simplificada
+        $offset0 = $this->allocVar($ids[0], $type0, $line, $col);
+        if ($offset0 !== null) {
+            $this->emit("str x0, [x29, #-$offset0]",
+                "{$ids[0]} ← x0 (primer retorno)");
+            $this->func->setType($ids[0], $type0);
+            $this->addSymbol($ids[0], $type0,
+                $this->func->name, null, $line, $col);
+        }
+
+        // Recuperar segundo retorno desde stack → ids[1]
+        $this->emit('ldr x1, [sp]',  'x1 (segundo retorno) ← stack');
+        $this->emit('add sp, sp, #16', 'liberar slot temporal');
+
+        if (isset($ids[1])) {
+            // El segundo retorno puede ser bool (1/0 en x1) o int32.
+            // Lo tratamos como 'int32' (bool se almacena igual en ARM64).
+            $type1   = 'int32';
+            $offset1 = $this->allocVar($ids[1], $type1, $line, $col);
+            if ($offset1 !== null) {
+                $this->emit("str x1, [x29, #-$offset1]",
+                    "{$ids[1]} ← x1 (segundo retorno)");
+                $this->func->setType($ids[1], $type1);
+                $this->addSymbol($ids[1], $type1,
+                    $this->func->name, null, $line, $col);
+            }
+        }
+
+        // ids[2], ids[3], ... (más de dos retornos) quedan en x2, x3...
+        // No generamos código extra porque el enunciado solo requiere hasta
+        // dos valores de retorno para el alcance de este proyecto.
+        if (count($ids) > 2) {
+            $this->addError(
+                'Semántico',
+                'Multi-return con más de 2 valores no está soportado en esta versión',
+                $line, $col
+            );
+        }
+
+        return null;
+    }
+
+    // ── Helper de almacenamiento ──────────────────────────────────────────
+
+    /**
+     * Almacena x0 o s0 en el frame slot correspondiente según el tipo inferido.
+     * Se reutiliza también en los casos normales A y B.
      */
     private function storeInferredResult(string $type, int $offset): void
     {
         if ($type === 'float32') {
-            $this->emit("str s0, [x29, #-$offset]", "guardar $type (inferido)");
+            $this->emit("str s0, [x29, #-$offset]", "guardar float32 inferido");
         } else {
-            $this->emit("str x0, [x29, #-$offset]", "guardar $type (inferido)");
+            $this->emit("str x0, [x29, #-$offset]", "guardar $type inferido");
         }
     }
 }
