@@ -267,8 +267,8 @@ AND : '&&';
 OR  : '||';
 
 // ==================== LITERALES ====================
-INT32   : [0-9]+;
-FLOAT32 : [0-9]+ '.' [0-9]+;
+FLOAT32 : [0-9]+ '.' [0-9]+;  // Token específico PRIMERO (ej: 3.14)
+INT32   : [0-9]+;              // Token general DESPUÉS (ej: 42)
 RUNE    : '\'' (~['\\] | '\\' .) '\'';
 STRING  : '"' (~["\\] | '\\' .)* '"';
 ID      : [a-zA-Z_][a-zA-Z0-9_]*;

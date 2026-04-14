@@ -1,4 +1,4 @@
-// Generated from /home/isai/Documentos/Github/OLC2_Proyecto1_202308204/Backend/Golampi.g4 by ANTLR 4.13.1
+// Generated from /home/isai/Documentos/Github/OLC2_Proyecto2_202308204/Backend/Golampi.g4 by ANTLR 4.13.1
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
 import org.antlr.v4.runtime.*;
@@ -23,7 +23,7 @@ public class GolampiParser extends Parser {
 		VAR=32, CONST=33, FUNC=34, IF=35, ELSE=36, SWITCH=37, CASE=38, DEFAULT=39, 
 		FOR=40, BREAK=41, CONTINUE=42, RETURN=43, TRUE=44, FALSE=45, NIL=46, INT32_TYPE=47, 
 		FLOAT32_TYPE=48, BOOL_TYPE=49, RUNE_TYPE=50, STRING_TYPE=51, AND=52, OR=53, 
-		INT32=54, FLOAT32=55, RUNE=56, STRING=57, ID=58, LINE_COMMENT=59, BLOCK_COMMENT=60, 
+		FLOAT32=54, INT32=55, RUNE=56, STRING=57, ID=58, LINE_COMMENT=59, BLOCK_COMMENT=60, 
 		WS=61;
 	public static final int
 		RULE_program = 0, RULE_declaration = 1, RULE_varDeclaration = 2, RULE_shortVarDeclaration = 3, 
@@ -72,7 +72,7 @@ public class GolampiParser extends Parser {
 			null, null, null, null, null, null, null, null, "VAR", "CONST", "FUNC", 
 			"IF", "ELSE", "SWITCH", "CASE", "DEFAULT", "FOR", "BREAK", "CONTINUE", 
 			"RETURN", "TRUE", "FALSE", "NIL", "INT32_TYPE", "FLOAT32_TYPE", "BOOL_TYPE", 
-			"RUNE_TYPE", "STRING_TYPE", "AND", "OR", "INT32", "FLOAT32", "RUNE", 
+			"RUNE_TYPE", "STRING_TYPE", "AND", "OR", "FLOAT32", "INT32", "RUNE", 
 			"STRING", "ID", "LINE_COMMENT", "BLOCK_COMMENT", "WS"
 		};
 	}
@@ -140,14 +140,6 @@ public class GolampiParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_program; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterProgram(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitProgram(this);
-		}
 	}
 
 	public final ProgramContext program() throws RecognitionException {
@@ -204,14 +196,6 @@ public class GolampiParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_declaration; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterDeclaration(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitDeclaration(this);
-		}
 	}
 
 	public final DeclarationContext declaration() throws RecognitionException {
@@ -258,8 +242,8 @@ public class GolampiParser extends Parser {
 			case TRUE:
 			case FALSE:
 			case NIL:
-			case INT32:
 			case FLOAT32:
+			case INT32:
 			case RUNE:
 			case STRING:
 			case ID:
@@ -306,14 +290,6 @@ public class GolampiParser extends Parser {
 			return getRuleContext(TypeContext.class,0);
 		}
 		public VarDeclSimpleContext(VarDeclarationContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterVarDeclSimple(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitVarDeclSimple(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class VarDeclWithInitContext extends VarDeclarationContext {
@@ -328,14 +304,6 @@ public class GolampiParser extends Parser {
 			return getRuleContext(ExpressionListContext.class,0);
 		}
 		public VarDeclWithInitContext(VarDeclarationContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterVarDeclWithInit(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitVarDeclWithInit(this);
-		}
 	}
 
 	public final VarDeclarationContext varDeclaration() throws RecognitionException {
@@ -407,14 +375,6 @@ public class GolampiParser extends Parser {
 			return getRuleContext(ExpressionListContext.class,0);
 		}
 		public ShortVarDeclContext(ShortVarDeclarationContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterShortVarDecl(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitShortVarDecl(this);
-		}
 	}
 
 	public final ShortVarDeclarationContext shortVarDeclaration() throws RecognitionException {
@@ -466,14 +426,6 @@ public class GolampiParser extends Parser {
 			return getRuleContext(ExpressionContext.class,0);
 		}
 		public ConstDeclContext(ConstDeclarationContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterConstDecl(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitConstDecl(this);
-		}
 	}
 
 	public final ConstDeclarationContext constDeclaration() throws RecognitionException {
@@ -532,14 +484,6 @@ public class GolampiParser extends Parser {
 			return getRuleContext(TypeContext.class,0);
 		}
 		public FuncDeclSingleReturnContext(FunctionDeclarationContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterFuncDeclSingleReturn(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitFuncDeclSingleReturn(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class FuncDeclMultiReturnContext extends FunctionDeclarationContext {
@@ -555,14 +499,6 @@ public class GolampiParser extends Parser {
 			return getRuleContext(ParameterListContext.class,0);
 		}
 		public FuncDeclMultiReturnContext(FunctionDeclarationContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterFuncDeclMultiReturn(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitFuncDeclMultiReturn(this);
-		}
 	}
 
 	public final FunctionDeclarationContext functionDeclaration() throws RecognitionException {
@@ -666,14 +602,6 @@ public class GolampiParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_parameterList; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterParameterList(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitParameterList(this);
-		}
 	}
 
 	public final ParameterListContext parameterList() throws RecognitionException {
@@ -733,14 +661,6 @@ public class GolampiParser extends Parser {
 			return getRuleContext(TypeContext.class,0);
 		}
 		public NormalParameterContext(ParameterContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterNormalParameter(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitNormalParameter(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class PointerParameterContext extends ParameterContext {
@@ -749,14 +669,6 @@ public class GolampiParser extends Parser {
 			return getRuleContext(TypeContext.class,0);
 		}
 		public PointerParameterContext(ParameterContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterPointerParameter(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitPointerParameter(this);
-		}
 	}
 
 	public final ParameterContext parameter() throws RecognitionException {
@@ -815,14 +727,6 @@ public class GolampiParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_typeList; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterTypeList(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitTypeList(this);
-		}
 	}
 
 	public final TypeListContext typeList() throws RecognitionException {
@@ -873,14 +777,6 @@ public class GolampiParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_idList; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterIdList(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitIdList(this);
-		}
 	}
 
 	public final IdListContext idList() throws RecognitionException {
@@ -933,14 +829,6 @@ public class GolampiParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_expressionList; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterExpressionList(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitExpressionList(this);
-		}
 	}
 
 	public final ExpressionListContext expressionList() throws RecognitionException {
@@ -1022,14 +910,6 @@ public class GolampiParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_statement; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterStatement(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitStatement(this);
-		}
 	}
 
 	public final StatementContext statement() throws RecognitionException {
@@ -1151,14 +1031,6 @@ public class GolampiParser extends Parser {
 			return getRuleContext(ExpressionContext.class,0);
 		}
 		public PointerAssignmentContext(AssignmentContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterPointerAssignment(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitPointerAssignment(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class SimpleAssignmentContext extends AssignmentContext {
@@ -1170,14 +1042,6 @@ public class GolampiParser extends Parser {
 			return getRuleContext(ExpressionContext.class,0);
 		}
 		public SimpleAssignmentContext(AssignmentContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterSimpleAssignment(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitSimpleAssignment(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class ArrayAssignmentContext extends AssignmentContext {
@@ -1192,14 +1056,6 @@ public class GolampiParser extends Parser {
 			return getRuleContext(ExpressionContext.class,i);
 		}
 		public ArrayAssignmentContext(AssignmentContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterArrayAssignment(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitArrayAssignment(this);
-		}
 	}
 
 	public final AssignmentContext assignment() throws RecognitionException {
@@ -1285,14 +1141,6 @@ public class GolampiParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_assignOp; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterAssignOp(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitAssignOp(this);
-		}
 	}
 
 	public final AssignOpContext assignOp() throws RecognitionException {
@@ -1341,27 +1189,11 @@ public class GolampiParser extends Parser {
 	public static class DecrementStatementContext extends IncDecStatementContext {
 		public TerminalNode ID() { return getToken(GolampiParser.ID, 0); }
 		public DecrementStatementContext(IncDecStatementContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterDecrementStatement(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitDecrementStatement(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class IncrementStatementContext extends IncDecStatementContext {
 		public TerminalNode ID() { return getToken(GolampiParser.ID, 0); }
 		public IncrementStatementContext(IncDecStatementContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterIncrementStatement(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitIncrementStatement(this);
-		}
 	}
 
 	public final IncDecStatementContext incDecStatement() throws RecognitionException {
@@ -1439,14 +1271,6 @@ public class GolampiParser extends Parser {
 			return getToken(GolampiParser.ELSE, i);
 		}
 		public IfElseIfElseContext(IfStatementContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterIfElseIfElse(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitIfElseIfElse(this);
-		}
 	}
 
 	public final IfStatementContext ifStatement() throws RecognitionException {
@@ -1530,14 +1354,6 @@ public class GolampiParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_switchStatement; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterSwitchStatement(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitSwitchStatement(this);
-		}
 	}
 
 	public final SwitchStatementContext switchStatement() throws RecognitionException {
@@ -1608,14 +1424,6 @@ public class GolampiParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_caseClause; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterCaseClause(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitCaseClause(this);
-		}
 	}
 
 	public final CaseClauseContext caseClause() throws RecognitionException {
@@ -1671,14 +1479,6 @@ public class GolampiParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_defaultClause; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterDefaultClause(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitDefaultClause(this);
-		}
 	}
 
 	public final DefaultClauseContext defaultClause() throws RecognitionException {
@@ -1741,14 +1541,6 @@ public class GolampiParser extends Parser {
 			return getRuleContext(BlockContext.class,0);
 		}
 		public ForTraditionalContext(ForStatementContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterForTraditional(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitForTraditional(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class ForWhileContext extends ForStatementContext {
@@ -1760,14 +1552,6 @@ public class GolampiParser extends Parser {
 			return getRuleContext(BlockContext.class,0);
 		}
 		public ForWhileContext(ForStatementContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterForWhile(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitForWhile(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class ForInfiniteContext extends ForStatementContext {
@@ -1776,14 +1560,6 @@ public class GolampiParser extends Parser {
 			return getRuleContext(BlockContext.class,0);
 		}
 		public ForInfiniteContext(ForStatementContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterForInfinite(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitForInfinite(this);
-		}
 	}
 
 	public final ForStatementContext forStatement() throws RecognitionException {
@@ -1855,14 +1631,6 @@ public class GolampiParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_forClause; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterForClause(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitForClause(this);
-		}
 	}
 
 	public final ForClauseContext forClause() throws RecognitionException {
@@ -1921,14 +1689,6 @@ public class GolampiParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_forInit; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterForInit(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitForInit(this);
-		}
 	}
 
 	public final ForInitContext forInit() throws RecognitionException {
@@ -1996,14 +1756,6 @@ public class GolampiParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_forPost; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterForPost(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitForPost(this);
-		}
 	}
 
 	public final ForPostContext forPost() throws RecognitionException {
@@ -2052,14 +1804,6 @@ public class GolampiParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_breakStatement; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterBreakStatement(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitBreakStatement(this);
-		}
 	}
 
 	public final BreakStatementContext breakStatement() throws RecognitionException {
@@ -2090,14 +1834,6 @@ public class GolampiParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_continueStatement; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterContinueStatement(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitContinueStatement(this);
-		}
 	}
 
 	public final ContinueStatementContext continueStatement() throws RecognitionException {
@@ -2131,14 +1867,6 @@ public class GolampiParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_returnStatement; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterReturnStatement(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitReturnStatement(this);
-		}
 	}
 
 	public final ReturnStatementContext returnStatement() throws RecognitionException {
@@ -2184,14 +1912,6 @@ public class GolampiParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_block; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterBlock(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitBlock(this);
-		}
 	}
 
 	public final BlockContext block() throws RecognitionException {
@@ -2241,14 +1961,6 @@ public class GolampiParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_expressionStatement; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterExpressionStatement(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitExpressionStatement(this);
-		}
 	}
 
 	public final ExpressionStatementContext expressionStatement() throws RecognitionException {
@@ -2281,14 +1993,6 @@ public class GolampiParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_expression; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterExpression(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitExpression(this);
-		}
 	}
 
 	public final ExpressionContext expression() throws RecognitionException {
@@ -2328,14 +2032,6 @@ public class GolampiParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_logicalOr; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterLogicalOr(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitLogicalOr(this);
-		}
 	}
 
 	public final LogicalOrContext logicalOr() throws RecognitionException {
@@ -2392,14 +2088,6 @@ public class GolampiParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_logicalAnd; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterLogicalAnd(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitLogicalAnd(this);
-		}
 	}
 
 	public final LogicalAndContext logicalAnd() throws RecognitionException {
@@ -2452,14 +2140,6 @@ public class GolampiParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_equality; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterEquality(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitEquality(this);
-		}
 	}
 
 	public final EqualityContext equality() throws RecognitionException {
@@ -2520,14 +2200,6 @@ public class GolampiParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_relational; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterRelational(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitRelational(this);
-		}
 	}
 
 	public final RelationalContext relational() throws RecognitionException {
@@ -2588,14 +2260,6 @@ public class GolampiParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_additive; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterAdditive(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitAdditive(this);
-		}
 	}
 
 	public final AdditiveContext additive() throws RecognitionException {
@@ -2659,14 +2323,6 @@ public class GolampiParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_multiplicative; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterMultiplicative(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitMultiplicative(this);
-		}
 	}
 
 	public final MultiplicativeContext multiplicative() throws RecognitionException {
@@ -2734,14 +2390,6 @@ public class GolampiParser extends Parser {
 	public static class AddressOfContext extends UnaryContext {
 		public TerminalNode ID() { return getToken(GolampiParser.ID, 0); }
 		public AddressOfContext(UnaryContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterAddressOf(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitAddressOf(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class NegativeUnaryContext extends UnaryContext {
@@ -2749,14 +2397,6 @@ public class GolampiParser extends Parser {
 			return getRuleContext(UnaryContext.class,0);
 		}
 		public NegativeUnaryContext(UnaryContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterNegativeUnary(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitNegativeUnary(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class NotUnaryContext extends UnaryContext {
@@ -2764,14 +2404,6 @@ public class GolampiParser extends Parser {
 			return getRuleContext(UnaryContext.class,0);
 		}
 		public NotUnaryContext(UnaryContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterNotUnary(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitNotUnary(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class DereferenceContext extends UnaryContext {
@@ -2779,14 +2411,6 @@ public class GolampiParser extends Parser {
 			return getRuleContext(UnaryContext.class,0);
 		}
 		public DereferenceContext(UnaryContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterDereference(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitDereference(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class PrimaryUnaryContext extends UnaryContext {
@@ -2794,14 +2418,6 @@ public class GolampiParser extends Parser {
 			return getRuleContext(PrimaryContext.class,0);
 		}
 		public PrimaryUnaryContext(UnaryContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterPrimaryUnary(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitPrimaryUnary(this);
-		}
 	}
 
 	public final UnaryContext unary() throws RecognitionException {
@@ -2817,8 +2433,8 @@ public class GolampiParser extends Parser {
 			case TRUE:
 			case FALSE:
 			case NIL:
-			case INT32:
 			case FLOAT32:
+			case INT32:
 			case RUNE:
 			case STRING:
 			case ID:
@@ -2900,14 +2516,6 @@ public class GolampiParser extends Parser {
 	public static class FloatLiteralContext extends PrimaryContext {
 		public TerminalNode FLOAT32() { return getToken(GolampiParser.FLOAT32, 0); }
 		public FloatLiteralContext(PrimaryContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterFloatLiteral(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitFloatLiteral(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class GroupedExpressionContext extends PrimaryContext {
@@ -2915,27 +2523,11 @@ public class GolampiParser extends Parser {
 			return getRuleContext(ExpressionContext.class,0);
 		}
 		public GroupedExpressionContext(PrimaryContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterGroupedExpression(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitGroupedExpression(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class FalseLiteralContext extends PrimaryContext {
 		public TerminalNode FALSE() { return getToken(GolampiParser.FALSE, 0); }
 		public FalseLiteralContext(PrimaryContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterFalseLiteral(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitFalseLiteral(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class ArrayAccessContext extends PrimaryContext {
@@ -2947,53 +2539,21 @@ public class GolampiParser extends Parser {
 			return getRuleContext(ExpressionContext.class,i);
 		}
 		public ArrayAccessContext(PrimaryContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterArrayAccess(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitArrayAccess(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class IdentifierContext extends PrimaryContext {
 		public TerminalNode ID() { return getToken(GolampiParser.ID, 0); }
 		public IdentifierContext(PrimaryContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterIdentifier(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitIdentifier(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class StringLiteralContext extends PrimaryContext {
 		public TerminalNode STRING() { return getToken(GolampiParser.STRING, 0); }
 		public StringLiteralContext(PrimaryContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterStringLiteral(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitStringLiteral(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class TrueLiteralContext extends PrimaryContext {
 		public TerminalNode TRUE() { return getToken(GolampiParser.TRUE, 0); }
 		public TrueLiteralContext(PrimaryContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterTrueLiteral(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitTrueLiteral(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class InnerArrayLiteralContext extends PrimaryContext {
@@ -3001,27 +2561,11 @@ public class GolampiParser extends Parser {
 			return getRuleContext(ExpressionListContext.class,0);
 		}
 		public InnerArrayLiteralContext(PrimaryContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterInnerArrayLiteral(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitInnerArrayLiteral(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class NilLiteralContext extends PrimaryContext {
 		public TerminalNode NIL() { return getToken(GolampiParser.NIL, 0); }
 		public NilLiteralContext(PrimaryContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterNilLiteral(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitNilLiteral(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class ArrayLiteralExprContext extends PrimaryContext {
@@ -3029,27 +2573,11 @@ public class GolampiParser extends Parser {
 			return getRuleContext(ArrayLiteralContext.class,0);
 		}
 		public ArrayLiteralExprContext(PrimaryContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterArrayLiteralExpr(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitArrayLiteralExpr(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class IntLiteralContext extends PrimaryContext {
 		public TerminalNode INT32() { return getToken(GolampiParser.INT32, 0); }
 		public IntLiteralContext(PrimaryContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterIntLiteral(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitIntLiteral(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class FunctionCallContext extends PrimaryContext {
@@ -3061,27 +2589,11 @@ public class GolampiParser extends Parser {
 			return getRuleContext(ArgumentListContext.class,0);
 		}
 		public FunctionCallContext(PrimaryContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterFunctionCall(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitFunctionCall(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class RuneLiteralContext extends PrimaryContext {
 		public TerminalNode RUNE() { return getToken(GolampiParser.RUNE, 0); }
 		public RuneLiteralContext(PrimaryContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterRuneLiteral(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitRuneLiteral(this);
-		}
 	}
 
 	public final PrimaryContext primary() throws RecognitionException {
@@ -3295,14 +2807,6 @@ public class GolampiParser extends Parser {
 			return getRuleContext(InnerLiteralListContext.class,0);
 		}
 		public FixedArrayLiteralNodeContext(ArrayLiteralContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterFixedArrayLiteralNode(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitFixedArrayLiteralNode(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class SliceLiteralNodeContext extends ArrayLiteralContext {
@@ -3313,14 +2817,6 @@ public class GolampiParser extends Parser {
 			return getRuleContext(ExpressionListContext.class,0);
 		}
 		public SliceLiteralNodeContext(ArrayLiteralContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterSliceLiteralNode(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitSliceLiteralNode(this);
-		}
 	}
 
 	public final ArrayLiteralContext arrayLiteral() throws RecognitionException {
@@ -3416,14 +2912,6 @@ public class GolampiParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_innerLiteralList; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterInnerLiteralList(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitInnerLiteralList(this);
-		}
 	}
 
 	public final InnerLiteralListContext innerLiteralList() throws RecognitionException {
@@ -3486,14 +2974,6 @@ public class GolampiParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_innerLiteral; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterInnerLiteral(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitInnerLiteral(this);
-		}
 	}
 
 	public final InnerLiteralContext innerLiteral() throws RecognitionException {
@@ -3544,14 +3024,6 @@ public class GolampiParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_argumentList; }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterArgumentList(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitArgumentList(this);
-		}
 	}
 
 	public final ArgumentListContext argumentList() throws RecognitionException {
@@ -3608,14 +3080,6 @@ public class GolampiParser extends Parser {
 	public static class AddressArgumentContext extends ArgumentContext {
 		public TerminalNode ID() { return getToken(GolampiParser.ID, 0); }
 		public AddressArgumentContext(ArgumentContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterAddressArgument(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitAddressArgument(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class ExpressionArgumentContext extends ArgumentContext {
@@ -3623,14 +3087,6 @@ public class GolampiParser extends Parser {
 			return getRuleContext(ExpressionContext.class,0);
 		}
 		public ExpressionArgumentContext(ArgumentContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterExpressionArgument(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitExpressionArgument(this);
-		}
 	}
 
 	public final ArgumentContext argument() throws RecognitionException {
@@ -3687,14 +3143,6 @@ public class GolampiParser extends Parser {
 	public static class Float32TypeContext extends TypeContext {
 		public TerminalNode FLOAT32_TYPE() { return getToken(GolampiParser.FLOAT32_TYPE, 0); }
 		public Float32TypeContext(TypeContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterFloat32Type(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitFloat32Type(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class ArrayTypeContext extends TypeContext {
@@ -3705,53 +3153,21 @@ public class GolampiParser extends Parser {
 			return getRuleContext(TypeContext.class,0);
 		}
 		public ArrayTypeContext(TypeContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterArrayType(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitArrayType(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class BoolTypeContext extends TypeContext {
 		public TerminalNode BOOL_TYPE() { return getToken(GolampiParser.BOOL_TYPE, 0); }
 		public BoolTypeContext(TypeContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterBoolType(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitBoolType(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class RuneTypeContext extends TypeContext {
 		public TerminalNode RUNE_TYPE() { return getToken(GolampiParser.RUNE_TYPE, 0); }
 		public RuneTypeContext(TypeContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterRuneType(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitRuneType(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class StringTypeContext extends TypeContext {
 		public TerminalNode STRING_TYPE() { return getToken(GolampiParser.STRING_TYPE, 0); }
 		public StringTypeContext(TypeContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterStringType(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitStringType(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class SliceTypeContext extends TypeContext {
@@ -3759,14 +3175,6 @@ public class GolampiParser extends Parser {
 			return getRuleContext(TypeContext.class,0);
 		}
 		public SliceTypeContext(TypeContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterSliceType(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitSliceType(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class PointerTypeContext extends TypeContext {
@@ -3774,27 +3182,11 @@ public class GolampiParser extends Parser {
 			return getRuleContext(TypeContext.class,0);
 		}
 		public PointerTypeContext(TypeContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterPointerType(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitPointerType(this);
-		}
 	}
 	@SuppressWarnings("CheckReturnValue")
 	public static class Int32TypeContext extends TypeContext {
 		public TerminalNode INT32_TYPE() { return getToken(GolampiParser.INT32_TYPE, 0); }
 		public Int32TypeContext(TypeContext ctx) { copyFrom(ctx); }
-		@Override
-		public void enterRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).enterInt32Type(this);
-		}
-		@Override
-		public void exitRule(ParseTreeListener listener) {
-			if ( listener instanceof GolampiListener ) ((GolampiListener)listener).exitInt32Type(this);
-		}
 	}
 
 	public final TypeContext type() throws RecognitionException {
@@ -4148,7 +3540,7 @@ public class GolampiParser extends Parser {
 		"\u0001\u0000\u0000\u0000\u0184\u017c\u0001\u0000\u0000\u0000\u0184\u017e"+
 		"\u0001\u0000\u0000\u0000\u0184\u0180\u0001\u0000\u0000\u0000\u0184\u0182"+
 		"\u0001\u0000\u0000\u0000\u0185G\u0001\u0000\u0000\u0000\u0186\u01ab\u0005"+
-		"6\u0000\u0000\u0187\u01ab\u00057\u0000\u0000\u0188\u01ab\u00058\u0000"+
+		"7\u0000\u0000\u0187\u01ab\u00056\u0000\u0000\u0188\u01ab\u00058\u0000"+
 		"\u0000\u0189\u01ab\u00059\u0000\u0000\u018a\u01ab\u0005,\u0000\u0000\u018b"+
 		"\u01ab\u0005-\u0000\u0000\u018c\u01ab\u0005.\u0000\u0000\u018d\u0190\u0005"+
 		":\u0000\u0000\u018e\u018f\u0005\u001f\u0000\u0000\u018f\u0191\u0005:\u0000"+

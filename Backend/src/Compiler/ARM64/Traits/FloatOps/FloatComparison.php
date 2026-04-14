@@ -73,7 +73,7 @@ trait FloatComparison
      */
     protected function emitFloat32ToDouble(): void
     {
-        $this->emit('fcvt d0, s0', 'float32 → float64 para printf variadic');
+        $this->emit('fcvt d0, s0', 'float32 a float64 para printf variadic');
     }
 
     /** Guarda s0 en el slot float del frame. */

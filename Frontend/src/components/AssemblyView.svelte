@@ -24,13 +24,12 @@
 
   function highlightRest(line) {
     // Split on first comment
+    // Only // is considered an inline comment (# within [...] is valid immediates/operands)
     const ciIdx = line.indexOf('//');
-    const hashIdx = line.indexOf(' #');  // inline # comment (after first space)
     let instr = line;
     let comment = '';
 
     if (ciIdx > 0) { instr = line.slice(0, ciIdx); comment = line.slice(ciIdx); }
-    else if (hashIdx > 0) { instr = line.slice(0, hashIdx); comment = line.slice(hashIdx); }
 
     // Highlight instruction mnemonic (first word)
     const mnemonicRe = /^(\s*)([a-z][a-z0-9._]*)/;

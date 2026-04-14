@@ -25,13 +25,12 @@ namespace Golampi\Compiler\ARM64\Traits\Emitter;
  */
 trait InstructionEmitter
 {
-    /** Emite una instrucción con comentario opcional alineado. */
+    /** Emite una instrucción con comentario opcional (en la misma línea). */
     protected function emit(string $instr, string $comment = ''): void
     {
         $line = "\t" . $instr;
         if ($comment !== '') {
-            $padding = max(1, 44 - strlen($line));
-            $line   .= str_repeat(' ', $padding) . '# ' . $comment;
+            $line .= "\t# " . $comment;  // Tab + # + comentario (simple)
         }
         $this->textLines[] = $line;
     }

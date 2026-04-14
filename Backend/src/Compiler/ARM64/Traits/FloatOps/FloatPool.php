@@ -59,11 +59,17 @@ trait FloatPool
     /**
      * Convierte un float PHP a literal reconocido por GNU as.
      * Casos especiales: NaN e Infinito usan el formato hexadecimal de bits.
+     * Asegura que los valores enteros tengan punto decimal (5.0 en lugar de 5).
      */
     private function floatToAsmLiteral(float $val): string
     {
         if (is_nan($val))      return '0r7FC00000'; // NaN canónico
         if (is_infinite($val)) return $val > 0 ? '0r7F800000' : '0rFF800000';
-        return sprintf('%.10g', $val);
+        $formatted = sprintf('%.10g', $val);
+        // Asegurar que valores enteros tengan punto decimal (5.0 en lugar de 5)
+        if (is_float($val) && floor($val) == $val && strpos($formatted, '.') === false) {
+            return $formatted . '.0';
+        }
+        return $formatted;
     }
 }

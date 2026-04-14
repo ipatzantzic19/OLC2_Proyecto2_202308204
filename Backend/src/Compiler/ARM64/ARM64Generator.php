@@ -330,13 +330,18 @@ class ARM64Generator extends \GolampiBaseVisitor
             $this->prescanBlock($funcDecl->block());
         }
 
-        // Renombrar main → _start conforme a ARM64 (enunciado sección 3.4.7)
-        $labelName                 = ($name === 'main') ? '_start' : $name;
+        // Usar main directamente (compatible con aarch64-linux-gnu-gcc)
+        $labelName                 = $name;
         $epilogueLabel             = '.epilogue_' . $labelName;
         $this->func->epilogueLabel = $epilogueLabel;
         $frameSize                 = $this->func->getFrameSize();
 
         // ── Prólogo ARM64 ────────────────────────────────────────────
+        $this->textLines[] = '';
+        if ($name === 'main') {
+            $this->textLines[] = '.align 3';  // Alineación de función principal
+        }
+        $this->textLines[] = '.global ' . $labelName;
         $this->textLines[] = '';
         $this->label($labelName);
         $this->comment("── función $name ── registro de activación ──");

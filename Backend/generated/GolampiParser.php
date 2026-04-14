@@ -1,7 +1,7 @@
 <?php
 
 /*
- * Generated from Backend/Golampi.g4 by ANTLR 4.13.1
+ * Generated from Golampi.g4 by ANTLR 4.13.0
  */
 
 namespace {
@@ -33,7 +33,7 @@ namespace {
                DEFAULT = 39, FOR = 40, BREAK = 41, CONTINUE = 42, RETURN = 43, 
                TRUE = 44, FALSE = 45, NIL = 46, INT32_TYPE = 47, FLOAT32_TYPE = 48, 
                BOOL_TYPE = 49, RUNE_TYPE = 50, STRING_TYPE = 51, AND = 52, 
-               OR = 53, INT32 = 54, FLOAT32 = 55, RUNE = 56, STRING = 57, 
+               OR = 53, FLOAT32 = 54, INT32 = 55, RUNE = 56, STRING = 57, 
                ID = 58, LINE_COMMENT = 59, BLOCK_COMMENT = 60, WS = 61;
 
 		public const RULE_program = 0, RULE_declaration = 1, RULE_varDeclaration = 2, 
@@ -90,7 +90,7 @@ namespace {
 		    "CONST", "FUNC", "IF", "ELSE", "SWITCH", "CASE", "DEFAULT", "FOR", 
 		    "BREAK", "CONTINUE", "RETURN", "TRUE", "FALSE", "NIL", "INT32_TYPE", 
 		    "FLOAT32_TYPE", "BOOL_TYPE", "RUNE_TYPE", "STRING_TYPE", "AND", "OR", 
-		    "INT32", "FLOAT32", "RUNE", "STRING", "ID", "LINE_COMMENT", "BLOCK_COMMENT", 
+		    "FLOAT32", "INT32", "RUNE", "STRING", "ID", "LINE_COMMENT", "BLOCK_COMMENT", 
 		    "WS"
 		];
 
@@ -287,7 +287,7 @@ namespace {
 		    384, 385, 5, 30, 0, 0, 385, 389, 5, 58, 0, 0, 386, 387, 5, 6, 0, 0, 
 		    387, 389, 3, 70, 35, 0, 388, 379, 1, 0, 0, 0, 388, 380, 1, 0, 0, 0, 
 		    388, 382, 1, 0, 0, 0, 388, 384, 1, 0, 0, 0, 388, 386, 1, 0, 0, 0, 
-		    389, 71, 1, 0, 0, 0, 390, 427, 5, 54, 0, 0, 391, 427, 5, 55, 0, 0, 
+		    389, 71, 1, 0, 0, 0, 390, 427, 5, 55, 0, 0, 391, 427, 5, 54, 0, 0, 
 		    392, 427, 5, 56, 0, 0, 393, 427, 5, 57, 0, 0, 394, 427, 5, 44, 0, 
 		    0, 395, 427, 5, 45, 0, 0, 396, 427, 5, 46, 0, 0, 397, 400, 5, 58, 
 		    0, 0, 398, 399, 5, 31, 0, 0, 399, 401, 5, 58, 0, 0, 400, 398, 1, 0, 
@@ -357,7 +357,7 @@ namespace {
 				return;
 			}
 
-			RuntimeMetaData::checkVersion('4.13.1', RuntimeMetaData::VERSION);
+			RuntimeMetaData::checkVersion('4.13.0', RuntimeMetaData::VERSION);
 
 			$atn = (new ATNDeserializer())->deserialize(self::SERIALIZED_ATN);
 
@@ -481,8 +481,8 @@ namespace {
 		            case self::TRUE:
 		            case self::FALSE:
 		            case self::NIL:
-		            case self::INT32:
 		            case self::FLOAT32:
+		            case self::INT32:
 		            case self::RUNE:
 		            case self::STRING:
 		            case self::ID:
@@ -1991,8 +1991,8 @@ namespace {
 		            case self::TRUE:
 		            case self::FALSE:
 		            case self::NIL:
-		            case self::INT32:
 		            case self::FLOAT32:
+		            case self::INT32:
 		            case self::RUNE:
 		            case self::STRING:
 		            case self::ID:

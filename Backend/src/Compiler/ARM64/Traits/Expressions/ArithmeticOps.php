@@ -176,7 +176,7 @@ trait ArithmeticOps
         // s0 ya contiene lhs (precondición)
         // Si lhsReg != s0, mover resulta
         if ($lhsReg !== 's0') {
-            $this->emit("mov $lhsReg, s0", 'mover lhs a registro asignado');
+            $this->emit("fmov $lhsReg, s0", 'mover lhs a registro asignado');
         }
 
         // Evaluar rhs → s0
@@ -189,7 +189,7 @@ trait ArithmeticOps
 
         // Si rhsReg != s0, mover resultado
         if ($rhsReg !== 's0') {
-            $this->emit("mov $rhsReg, s0", 'mover rhs a registro asignado');
+            $this->emit("fmov $rhsReg, s0", 'mover rhs a registro asignado');
         }
 
         // Emitir operación binaria SIN spill
@@ -206,7 +206,7 @@ trait ArithmeticOps
         // Resultado en lhsReg (típicamente s0)
         // Si lhsReg != s0, mover resultado a s0 para consistencia
         if ($lhsReg !== 's0') {
-            $this->emit("mov s0, $lhsReg", 'mover resultado a s0');
+            $this->emit("fmov s0, $lhsReg", 'mover resultado a s0');
         }
 
         return 'float32';

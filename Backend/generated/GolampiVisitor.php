@@ -1,7 +1,7 @@
 <?php
 
 /*
- * Generated from Backend/Golampi.g4 by ANTLR 4.13.1
+ * Generated from Golampi.g4 by ANTLR 4.13.0
  */
 
 use Antlr\Antlr4\Runtime\Tree\ParseTreeVisitor;

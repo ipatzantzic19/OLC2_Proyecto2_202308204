@@ -23,7 +23,7 @@ namespace Golampi\Compiler\ARM64\Traits\StringOps;
 trait TypeOfHelper
 {
     /**
-     * Genera código para typeOf(expr) → string del tipo en x0.
+     * Genera código para typeOf(expr) - string del tipo en x0.
      *
      * @param string $type tipo ya conocido en compile-time
      */
@@ -41,7 +41,7 @@ trait TypeOfHelper
         };
 
         $label = $this->internString($displayName);
-        $this->comment("typeOf → '$displayName'");
+        $this->comment("typeOf: '$displayName'");
         $this->emit("adrp x0, $label");
         $this->emit("add x0, x0, :lo12:$label");
     }

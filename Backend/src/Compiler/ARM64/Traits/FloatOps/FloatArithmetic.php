@@ -28,7 +28,7 @@ namespace Golampi\Compiler\ARM64\Traits\FloatOps;
  *   fsub s0, s1, s0   → resta float32
  *   fmul s0, s1, s0   → multiplicación float32
  *   fdiv s0, s1, s0   → división float32
- *   fneg s0, s0       → negación float32 (unario)
+ *   fneg s0, s0       - negacion float32 (unario)
  */
 trait FloatArithmetic
 {
