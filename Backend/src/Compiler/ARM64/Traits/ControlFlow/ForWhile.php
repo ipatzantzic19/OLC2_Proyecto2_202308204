@@ -39,7 +39,7 @@ trait ForWhile
         $this->label($startLabel);
         $this->comment('for-while condición');
         $this->visit($ctx->expression());
-        $this->emit("cbz x0, $endLabel", 'falso → salir');
+        $this->emit("cbz x0, $endLabel", 'falso salir');
 
         $this->generateBlock($ctx->block());
 

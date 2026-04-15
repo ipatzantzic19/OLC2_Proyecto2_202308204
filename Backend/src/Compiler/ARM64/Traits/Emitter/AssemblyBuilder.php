@@ -52,16 +52,6 @@ trait AssemblyBuilder
     {
         $lines = [];
 
-        // ── Cabecera ──────────────────────────────────────────────────────
-        $lines[] = '# ============================================================';
-        $lines[] = '# Golampi Compiler — Fase 2 — ARM64 (AArch64)';
-        $lines[] = '# Compilar:';
-        $lines[] = '#   aarch64-linux-gnu-gcc -o programa program.s -lc';
-        $lines[] = '# Ejecutar:';
-        $lines[] = '#   qemu-aarch64 -L /usr/aarch64-linux-gnu ./programa';
-        $lines[] = '# ============================================================';
-        $lines[] = '';
-
         // ── Sección .data ─────────────────────────────────────────────────
         if (!empty($this->dataLines)) {
             $lines[] = '.section .data';

@@ -36,7 +36,7 @@ trait FloatArithmetic
     protected function pushFloatStack(): void
     {
         $this->emit('sub sp, sp, #16', 'reservar slot float temporal');
-        $this->emit('str s0, [sp]',    's0 → stack temporal');
+        $this->emit('str s0, [sp]',    's0 stack temporal');
         if ($this->func) $this->func->pushTemp();
     }
 
@@ -46,7 +46,7 @@ trait FloatArithmetic
      */
     protected function popFloatStack(): void
     {
-        $this->emit('ldr s1, [sp]', 'stack → s1 (lhs float)');
+        $this->emit('ldr s1, [sp]', 'stack s1 (lhs float)');
         $this->emit('add sp, sp, #16');
         if ($this->func) $this->func->popTemp();
     }

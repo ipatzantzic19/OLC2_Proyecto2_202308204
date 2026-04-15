@@ -344,7 +344,7 @@ class ARM64Generator extends \GolampiBaseVisitor
         $this->textLines[] = '.global ' . $labelName;
         $this->textLines[] = '';
         $this->label($labelName);
-        $this->comment("── función $name ── registro de activación ──");
+        $this->comment("-- funcion $name -- registro de activacion --");
         $this->emit('stp x29, x30, [sp, #-16]!', 'guardar fp (enlace control) y lr');
         $this->emit('mov x29, sp',                'establecer frame pointer');
 

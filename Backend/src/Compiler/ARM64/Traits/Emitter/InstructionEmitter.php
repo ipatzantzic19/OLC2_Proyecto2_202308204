@@ -25,14 +25,14 @@ namespace Golampi\Compiler\ARM64\Traits\Emitter;
  */
 trait InstructionEmitter
 {
-    /** Emite una instrucción con comentario opcional (en la misma línea). */
+    /** Emite una instrucción con comentario opcional (en línea separada). */
     protected function emit(string $instr, string $comment = ''): void
     {
         $line = "\t" . $instr;
-        if ($comment !== '') {
-            $line .= "\t# " . $comment;  // Tab + # + comentario (simple)
-        }
         $this->textLines[] = $line;
+        if ($comment !== '') {
+            $this->textLines[] = "\t# " . $comment;
+        }
     }
 
     /** Emite una etiqueta (label:) sin indentación. */

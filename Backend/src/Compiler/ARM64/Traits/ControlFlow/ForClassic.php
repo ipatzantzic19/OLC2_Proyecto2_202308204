@@ -52,7 +52,7 @@ trait ForClassic
         if ($cond !== null) {
             $this->comment('for condición');
             $this->visit($cond);
-            $this->emit("cbz x0, $endLabel", 'falso → salir del bucle');
+            $this->emit("cbz x0, $endLabel", 'falso salir del bucle');
         }
 
         // ── Cuerpo del bucle ─────────────────────────────────────────────

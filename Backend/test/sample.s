@@ -1,11 +1,3 @@
-# ============================================================
-# Golampi Compiler — Fase 2 — ARM64 (AArch64)
-# Compilar:
-#   aarch64-linux-gnu-gcc -o programa program.s -lc
-# Ejecutar:
-#   qemu-aarch64 -L /usr/aarch64-linux-gnu ./programa
-# ============================================================
-
 .section .data
 .align 2
 .flt_0: .single 5.0
@@ -22,7 +14,7 @@
 .global main
 
 main:
-	# ── función main ── registro de activación ──
+	# -- funcion main -- registro de activacion --
 	stp x29, x30, [sp, #-16]!
 	# guardar fp (enlace control) y lr
 	mov x29, sp
