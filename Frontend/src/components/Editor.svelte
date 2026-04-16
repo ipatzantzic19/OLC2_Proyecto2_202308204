@@ -99,10 +99,10 @@
       
       // Convertir symbolTable (objeto asociativo) a array de símbolos
       const symbolTableObj = result.symbolTable ?? {};
-      const symbolsArray = Object.entries(symbolTableObj).map(([key, value]) => ({
+      const symbolsArray = Object.entries(symbolTableObj).map(([key, value]: [string, any]) => ({
         identifier: key,
         ...(value && typeof value === 'object' ? value : {}),
-      })).filter(sym => sym.type !== undefined); // Filtrar entradas sin type
+      } as any)).filter((sym: any) => sym.type !== undefined); // Filtrar entradas sin type
       
       compileSymbols.set(symbolsArray);
       compileSuccess.set(result.success);
@@ -133,10 +133,10 @@
     const r = await fetchCompileSymbols(); 
     if (r?.success) {
       const symbolTableObj = r.symbolTable ?? {};
-      const symbolsArray = Object.entries(symbolTableObj).map(([key, value]) => ({
+      const symbolsArray = Object.entries(symbolTableObj).map(([key, value]: [string, any]) => ({
         identifier: key,
         ...(value && typeof value === 'object' ? value : {}),
-      })).filter(sym => sym.type !== undefined);
+      } as any)).filter((sym: any) => sym.type !== undefined);
       compileSymbols.set(symbolsArray);
     }
     modalContent = 'symbols'; 
