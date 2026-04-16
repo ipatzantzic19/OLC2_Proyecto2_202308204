@@ -90,11 +90,6 @@ trait SimpleAssignment
      */
     protected function storeToFrame(string $type, int $offset): void
     {
-        if ($offset === 0) {
-            // OPTIMIZACIÓN: Variable en registro, no guardar al stack
-            return;
-        }
-
         if ($type === 'float32') {
             $this->emit("str s0, [x29, #-$offset]", 'guardar float32');
         } else {
@@ -107,12 +102,6 @@ trait SimpleAssignment
      */
     protected function loadFromFrame(string $type, int $offset): void
     {
-        if ($offset === 0) {
-            // OPTIMIZACIÓN: Variable en registro, ya está disponible
-            // No hacer nada, asumir que el valor está en xо/s0 de operación anterior
-            return;
-        }
-
         if ($type === 'float32') {
             $this->emit("ldr s0, [x29, #-$offset]", 'cargar float32');
         } else {

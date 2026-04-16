@@ -38,10 +38,8 @@ trait LocalsManager
      * Registra una variable escalar en el stack frame.
      * Devuelve el offset desde fp donde se almacena.
      *
-     * OPTIMIZACIÓN FASE 3 (Simplificada):
-     * Variables escalares simples (int32, float32, rune, bool) que NO son parámetros
-     * NO necesitan stack offset. Se pueden mantener en registros.
-     * Devolvemos offset=0 como marca: "no está en stack tradicional".
+     * Todas las variables se almacenan en stack: [fp-8], [fp-16], etc.
+     * Esto evita que se sobrescriban entre sí cuando se usan en expresiones complejas.
      *
      * Precondición: $name debe ser un identificador válido.
      * Postcondición: la variable está en $locals.
@@ -49,7 +47,7 @@ trait LocalsManager
      * @param string $name    nombre de la variable
      * @param string $type    tipo: 'int32', 'float32', 'bool', 'string', 'rune', 'nil'
      * @param bool   $isParam true si es parámetro formal (copiado desde registros x0-x7)
-     * @return int   offset desde fp: [fp - $offset], o 0 si vive en registros (sin offset)
+     * @return int   offset desde fp: [fp - $offset]
      */
     public function allocLocal(string $name, string $type, bool $isParam = false): int
     {
@@ -61,14 +59,9 @@ trait LocalsManager
             return $this->locals[$name]['offset'];
         }
 
-        // OPTIMIZACIÓN: Variables simples NO parametro → offset = 0 (viven en registros)
-        if (!$isParam && in_array($type, ['int32', 'float32', 'rune', 'bool'])) {
-            $offset = 0;  // Marca especial: "sin offset en stack"
-        } else {
-            // Variables que NECESITAN stack: parametros, strings, arrays grandes, etc.
-            $offset = $this->nextOffset;
-            $this->nextOffset += 8;  // Siguiente slot
-        }
+        // Todas las variables reciben un offset en stack real
+        $offset = $this->nextOffset;
+        $this->nextOffset += 8;  // Siguiente slot
 
         $this->locals[$name] = [
             'offset'   => $offset,

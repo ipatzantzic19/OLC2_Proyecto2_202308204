@@ -214,12 +214,6 @@ trait ShortVarDecl
      */
     private function storeInferredResult(string $type, int $offset): void
     {
-        // OPTIMIZACIÓN: offset=0 significa "sin stack" → variable vive en registros
-        if ($offset === 0) {
-            // No guardar al stack, el valor ya está en x0/s0
-            return;
-        }
-
         if ($type === 'float32') {
             $this->emit("str s0, [x29, #-$offset]", "guardar float32 inferido");
         } else {

@@ -9,18 +9,10 @@
 .section .text
 .global _start
 
-
-.align 3
-.global main
-
-main:
-	# -- funcion main -- registro de activacion --
+_start:
 	stp x29, x30, [sp, #-16]!
-	# guardar fp (enlace control) y lr
 	mov x29, sp
-	# establecer frame pointer
-	sub sp, sp, #32
-	# reservar 32 bytes (locales + params)
+	# frame.size=0, locals=0
 	# a := expr (tipo inferido)
 	# float32 literal 5.0 → s0
 	adrp x9, .flt_0
@@ -40,14 +32,17 @@ main:
 	# c := expr (tipo inferido)
 	ldr s0, [x29, #-8]
 	# a (float32)
-	fmov s1, s0
-	# mover lhs a registro asignado
+	sub sp, sp, #16
+	# reservar slot float temporal
+	str s0, [sp]
+	# s0 stack temporal
 	ldr s0, [x29, #-16]
 	# b (float32)
-	fsub s1, s1, s0
-	# float32 resta optimizada
-	fmov s0, s1
-	# mover resultado a s0
+	ldr s1, [sp]
+	# stack s1 (lhs float)
+	add sp, sp, #16
+	fsub s0, s1, s0
+	# float32 resta
 	str s0, [x29, #-24]
 	# guardar float32 inferido
 	ldr s0, [x29, #-24]
@@ -61,12 +56,6 @@ main:
 	adrp x0, .str_1
 	add x0, x0, :lo12:.str_1
 	bl printf
-.epilogue_main:
-	# ── epílogo main ──
 	add sp, sp, #32
-	# liberar espacio de locales
 	ldp x29, x30, [sp], #16
-	# restaurar fp y lr
-	mov x0, #0
-	# exit code 0
 	ret

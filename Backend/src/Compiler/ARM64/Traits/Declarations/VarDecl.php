@@ -114,11 +114,6 @@ trait VarDecl
      */
     private function storeResultTyped(string $type, int $offset): void
     {
-        if ($offset === 0) {
-            // OPTIMIZACIÓN: Variable en registro, no guardar
-            return;
-        }
-
         if ($type === 'float32') {
             $this->emit("str s0, [x29, #-$offset]", 'guardar float32');
         } else {

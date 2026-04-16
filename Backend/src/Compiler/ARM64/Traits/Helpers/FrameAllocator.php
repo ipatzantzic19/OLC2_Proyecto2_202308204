@@ -54,12 +54,6 @@ trait FrameAllocator
      */
     protected function storeDefault(string $type, int $offset): void
     {
-        if ($offset === 0) {
-            // OPTIMIZACIÓN: Variable en registro, no guardar valor por defecto al stack
-            // El valor por defecto ya está implícitamente en el registro
-            return;
-        }
-
         switch ($type) {
             case 'float32':
                 // movi d0, #0 pone ceros en todos los bits de d0 (incluye s0)
