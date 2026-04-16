@@ -58,11 +58,31 @@ trait PrescanPhase
             }
 
             // Procesar nodos que declaran variables
-            $class = class_basename($child);
+            $fullClass = get_class($child);
+            $class = substr($fullClass, strrpos($fullClass, '\\') + 1);
+
             switch ($class) {
+                case 'VarDeclSimpleContext':
+                case 'VarDeclWithInitContext':
                 case 'VarDeclContext':
                     $this->prescanVarDecl($child);
                     break;
+                    
+                case 'DeclarationContext':
+                    // Buscar variable declarations dentro de Declaration
+                    for ($j = 0; $j < $child->getChildCount(); $j++) {
+                        $declChild = $child->getChild($j);
+                        if ($declChild instanceof \TerminalNode) continue;
+                        
+                        $declFullClass = get_class($declChild);
+                        $declClass = substr($declFullClass, strrpos($declFullClass, '\\') + 1);
+                        
+                        if ($declClass === 'VarDeclSimpleContext' || $declClass === 'VarDeclWithInitContext' || $declClass === 'VarDeclContext') {
+                            $this->prescanVarDecl($declChild);
+                        }
+                    }
+                    break;
+                    
                 case 'ShortVarDeclContext':
                     $this->prescanShortVarDecl($child);
                     break;
@@ -94,38 +114,190 @@ trait PrescanPhase
     /**
      * Prescan de declaración de variable: var x T = expr
      * Extrae tipo y registra la variable en FunctionContext.
+     * 
+     * Fase 3: Detecta arrays y los registra con allocArray en lugar de allocLocal.
      */
     protected function prescanVarDecl($varDeclCtx): void
     {
         if (!isset($this->func)) return;
 
-        // Patrón: var x T
-        // varDeclCtx->identifierList()->getChild(0) = nombre
-        // varDeclCtx->typeSpec() = tipo de la variable
+        // Obtener la lista de identificadores
+        $idList = $varDeclCtx->idList();
+        if (!$idList) return;
 
-        $identList = $varDeclCtx->identifierList();
-        $typeCtx   = $varDeclCtx->typeSpec();
+        // Obtener el tipo
+        $typeCtx = $varDeclCtx->type();
+        if (!$typeCtx) return;
 
-        if (!$identList || !$typeCtx) {
-            return;
-        }
-
+        // Verificar si es un tipo array
+        $arrayDims = $this->extractArrayDimensionsFromPhase($typeCtx);
         $type = $this->getTypeName($typeCtx);
 
-        // Puede haber múltiples identificadores: var x, y, z T
-        $count = $identList->getChildCount();
-        for ($i = 0; $i < $count; $i++) {
-            $child = $identList->getChild($i);
-            if ($child instanceof \TerminalNode) {
-                continue;
-            }
-            if (method_exists($child, 'getText')) {
-                $name = $child->getText();
-                // Registrar en FunctionContext
+        // Registrar cada identificador
+        for ($i = 0; $i < $idList->getChildCount(); $i += 2) {
+            $child = $idList->getChild($i);
+            $name = $child->getText();
+
+            if (!empty($arrayDims)) {
+                // Es un array: registrar con allocArray
+                $elemType = $this->extractArrayElementTypeFromPhase($typeCtx);
+                $this->func->allocArray($name, $arrayDims, $elemType);
+            } else {
+                // Variable escalar: registrar con allocLocal
                 $this->func->allocLocal($name, $type);
             }
         }
     }
+
+    /**
+     * Extrae dimensiones de un tipo array (versión para PrescanPhase).
+     * Reutiliza la lógica de Prescan trait.
+     */
+    private function extractArrayDimensionsFromPhase($typeCtx): array
+    {
+        if ($typeCtx === null) return [];
+
+        $dims = [];
+        try {
+            $current = $typeCtx;
+            $visits = 0;
+            $maxVisits = 100;
+
+            while ($current !== null && $visits < $maxVisits) {
+                $visits++;
+                $class = get_class($current);
+                $base  = substr($class, strrpos($class, '\\') + 1);
+
+                if ($base === 'ArrayTypeContext') {
+                    $expr = null;
+                    if (is_callable([$current, 'expression'])) {
+                        try {
+                            $expr = $current->expression();
+                        } catch (\Throwable $e) {}
+                    }
+
+                    if ($expr !== null) {
+                        $dimValue = $this->evaluateLiteralExpressionFromPhase($expr);
+                        
+                        if ($dimValue !== null && $dimValue > 0) {
+                            $dims[] = $dimValue;
+                            
+                            if (is_callable([$current, 'type'])) {
+                                try {
+                                    $current = $current->type();
+                                } catch (\Throwable $e) {
+                                    $current = null;
+                                }
+                            } else {
+                                $current = null;
+                            }
+                        } else {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+        } catch (\Throwable $e) {
+            return [];
+        }
+
+        return $dims;
+    }
+
+    /**
+     * Extrae el tipo de elemento de un array (versión para PrescanPhase).
+     */
+    private function extractArrayElementTypeFromPhase($typeCtx): string
+    {
+        if ($typeCtx === null) return 'int32';
+
+        try {
+            $current = $typeCtx;
+
+            while ($current !== null) {
+                $class = get_class($current);
+                $base  = substr($class, strrpos($class, '\\') + 1);
+
+                if ($base === 'ArrayTypeContext') {
+                    if (is_callable([$current, 'type'])) {
+                        try {
+                            $current = $current->type();
+                        } catch (\Throwable $e) {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                } else {
+                    return $this->getTypeName($current);
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        return 'int32';
+    }
+
+    /**
+     * Evalúa una expresión literal para obtener su valor numérico (versión para PrescanPhase).
+     */
+    private function evaluateLiteralExpressionFromPhase($exprCtx): ?int
+    {
+        try {
+            $class = get_class($exprCtx);
+            $base  = substr($class, strrpos($class, '\\') + 1);
+
+            // Caso 1: IntLiteralContext
+            if ($base === 'IntLiteralContext') {
+                $intToken = $exprCtx->INT32();
+                if ($intToken !== null) {
+                    return (int)$intToken->getText();
+                }
+            }
+
+            // Caso 2: ExpressionContext con INT32 método
+            if (is_callable([$exprCtx, 'INT32'])) {
+                $intToken = $exprCtx->INT32();
+                if ($intToken !== null) {
+                    return (int)$intToken->getText();
+                }
+            }
+
+            // Caso 3: ExpressionContext con intLiteral() o primaryExpr() método
+            if (is_callable([$exprCtx, 'intLiteral'])) {
+                try {
+                    $intLit = $exprCtx->intLiteral();
+                    if ($intLit !== null) {
+                        return $this->evaluateLiteralExpressionFromPhase($intLit);  // Recurse
+                    }
+                } catch (\Throwable $e) {}
+            }
+
+            // Caso 4: Buscar en hijos directamente
+            for ($i = 0; $i < $exprCtx->getChildCount(); $i++) {
+                $child = $exprCtx->getChild($i);
+                $childText = $child->getText();
+                
+                if ($child instanceof \TerminalNode) {
+                    if (is_numeric($childText)) {
+                        return (int)$childText;
+                    }
+                } else {
+                    // Si es un contexto, intentar recursivo  
+                    $rec = $this->evaluateLiteralExpressionFromPhase($child);
+                    if ($rec !== null) {
+                        return $rec;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        return null;
+    }
+
 
     /**
      * Prescan de declaración corta: x := expr

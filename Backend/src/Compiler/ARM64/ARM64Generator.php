@@ -35,6 +35,7 @@ require_once __DIR__ . '/Traits/Declarations/DeclHandler.php';
 require_once __DIR__ . '/Traits/Expressions/ExpressionsHandler.php';
 
 // ── Nuevo sistema de fases (separación arquitectónica) ──────────────────────
+require_once __DIR__ . '/FunctionContext.php';
 require_once __DIR__ . '/Traits/Phases/PrescanPhase.php';
 require_once __DIR__ . '/Traits/Phases/GenerationPhase.php';
 require_once __DIR__ . '/Traits/Phases/ProgramPhase.php';
@@ -231,18 +232,25 @@ class ARM64Generator extends \GolampiBaseVisitor
 
     /**
      * Punto de entrada principal del generador.
-     * Visita el árbol del programa y retorna el resultado de compilación.
+     * Usa el nuevo sistema de fases (PrescanPhase + GenerationPhase).
      */
     public function generateFromTree($programCtx): CompilationResult
     {
         $start = microtime(true);
-        $this->visit($programCtx);
+        $result = $this->phaseCompileProgram($programCtx);
         $elapsed = round((microtime(true) - $start) * 1000, 2) . 'ms';
 
+        // Asegurar que result tenga la propiedad elapsed correcta
+        if ($result instanceof \Golampi\Compiler\CompilationResult) {
+            // Retornar directamente el resultado que phaseCompileProgram retornó
+            return $result;
+        }
+
+        // Fallback (no debería ocurrir)
         return new CompilationResult(
-            $this->buildAssembly(),
-            $this->errors,
-            $this->symbolTable,
+            $result->assembly ?? $this->buildAssembly(),
+            $result->errors ?? $this->errors,
+            $result->symbolTable ?? $this->symbolTable,
             $elapsed
         );
     }
@@ -252,48 +260,23 @@ class ARM64Generator extends \GolampiBaseVisitor
     // ═══════════════════════════════════════════════════════════════════════
 
     /**
-     * visitProgram implementa el hoisting de funciones en dos pasadas:
+     * visitProgram — Punto de entrada para la compilación.
+     * Ahora delega a phaseCompileProgram (ProgramPhase) que usa PrescanPhase + GenerationPhase.
      *
-     *   Pasada 1: Registrar todas las funciones de usuario y localizar main().
-     *             Esto permite llamar a funciones antes de su definición textual.
-     *
-     *   Pasada 2: Generar código para main() primero, luego las demás funciones.
-     *             El orden asegura que main sea el punto de entrada del ejecutable.
+     * Flujo:
+     *   1. phasePrescanGlobalFunctions: hoisting de funciones
+     *   2. Para cada función: phaseGenerateFunction
+     *      - phasePrescanBlock: registra variables/arrays
+     *      - phaseGeneratePrologue: stp x29, x30; mov fp, sp; sub sp, sp, #FRAME_SIZE
+     *      - phaseGenerateBlock: recorre AST y genera instrucciones
+     *      - phaseGenerateEpilogue: restaura registros y ret
+     *   3. phaseGenerateSymbolTable: crea tabla para depuración
+     *   4. phaseGenerateHelpers: emite funciones auxiliares (concat, substr, now)
+     *   5. buildAssembly: combina todo en output final
      */
     public function visitProgram($ctx)
     {
-        $mainDecl = null;
-
-        // ── Pasada 1: hoisting ────────────────────────────────────────────
-        for ($i = 0; $i < $ctx->getChildCount() - 1; $i++) {
-            $child = $ctx->getChild($i);
-            if (!($child instanceof \Antlr\Antlr4\Runtime\ParserRuleContext)) continue;
-
-            $funcDecl = $this->extractFuncDecl($child);
-            if ($funcDecl === null) continue;
-
-            $name = $funcDecl->ID()->getText();
-            if ($name === 'main') {
-                $mainDecl = $funcDecl;
-            } else {
-                $this->userFunctions[$name] = $funcDecl;
-            }
-        }
-
-        if ($mainDecl === null) {
-            $this->addError('Semántico', 'No se encontró la función main()', 0, 0);
-            return null;
-        }
-
-        // ── Pasada 2: generación ──────────────────────────────────────────
-        // main primero (punto de entrada del programa)
-        $this->generateFunction($mainDecl);
-        // Funciones de usuario después
-        foreach ($this->userFunctions as $decl) {
-            $this->generateFunction($decl);
-        }
-
-        return null;
+        return $this->phaseCompileProgram($ctx);
     }
 
     // ═══════════════════════════════════════════════════════════════════════

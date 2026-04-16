@@ -117,17 +117,160 @@ trait UnaryOps
         return $this->visit($ctx->expression());
     }
 
-    // ── Arrays (pendiente Fase 3) ─────────────────────────────────────────
+    // ── Arrays (Fase 3 — Lectura y literales) ────────────────────────────────
 
+    /**
+     * Acceso a elemento de array: ID ('[' expression ']')+
+     * 
+     * Ejemplo: a[i], m[i][j]
+     * 
+     * Estrategia:
+     *   1. Evaluar cada índice → stack
+     *   2. Calcular offset dinámico (row-major)
+     *   3. Cargar dirección base del array
+     *   4. Calcular dirección del elemento
+     *   5. ldr x0, [dirección] → resultado
+     */
     public function visitArrayAccess($ctx)
     {
-        $this->emit('mov x0, xzr', 'array access — pendiente Fase 3');
-        return 'int32';
+        $name = $ctx->ID()->getText();
+        $line = $ctx->getStart()->getLine();
+        $col  = $ctx->getStart()->getCharPositionInLine();
+
+        if (!$this->func) {
+            $this->addError('Semántico', "No hay contexto de función", $line, $col);
+            $this->emit('mov x0, xzr', 'array access error → 0');
+            return 'int32';
+        }
+
+        if (!$this->func->hasArray($name)) {
+            $this->addError('Semántico', "Array '$name' no declarado", $line, $col);
+            $this->emit('mov x0, xzr', "array $name no encontrado");
+            return 'int32';
+        }
+
+        $arrayInfo = $this->func->getArrayInfo($name);
+        if ($arrayInfo === null) {
+            $this->addError('Semántico', "Array '$name' no tiene información", $line, $col);
+            $this->emit('mov x0, xzr');
+            return 'int32';
+        }
+
+        $elemType = $arrayInfo['elem_type'];
+        $dims = $arrayInfo['dims'];
+
+        // ── Extraer índices ───────────────────────────────────────────────
+        $indices = [];
+        for ($i = 0; $i < $ctx->getChildCount(); $i++) {
+            $child = $ctx->getChild($i);
+            if ($child instanceof \Antlr\Antlr4\Runtime\ParserRuleContext) {
+                $class = get_class($child);
+                if (str_ends_with($class, 'ExpressionContext')) {
+                    $indices[] = $child;
+                }
+            }
+        }
+
+        // Validar cantidad de índices
+        if (count($indices) !== count($dims)) {
+            $this->addError('Semántico',
+                "Array '$name' requiere " . count($dims) . " índices, se proporcionaron " . count($indices),
+                $line, $col);
+            $this->emit('mov x0, xzr');
+            return $elemType;
+        }
+
+        $this->comment("$name" . $this->formatArrayIndices($indices) . " (lectura)");
+
+        // ── Evaluar y guardar cada índice ─────────────────────────────────
+        foreach ($indices as $idxExpr) {
+            $this->visit($idxExpr);  // Resultado en x0
+            $this->pushStack();       // Guardar índice en stack
+        }
+
+        // ── Calcular offset dinámico ──────────────────────────────────────
+        $this->computeReadArrayOffset($indices, $dims);
+        // x1 contiene el offset dinámico en bytes
+
+        // ── Calcular dirección final ──────────────────────────────────────
+        $baseOffset = $arrayInfo['base_offset'];
+        $this->emit("sub x2, x29, #$baseOffset", "dirección base del array $name → x2");
+        $this->emit('add x3, x2, x1', "x3 = base + offset_dinámico");
+
+        // ── Cargar el valor ───────────────────────────────────────────────
+        if ($elemType === 'float32') {
+            $this->emit('ldr s0, [x3]', $name . '[idx] (lectura) → s0 (float32)');
+        } else {
+            $this->emit('ldr x0, [x3]', $name . '[idx] (lectura) → x0');
+        }
+
+        return $elemType;
     }
 
+    /**
+     * Literal de array: [N]type{...}
+     * 
+     * Fase 3: Generación de inicializadores de arrays.
+     * Para literales fijos como [10]int32 { 1, 2, 3, ... }
+     */
     public function visitArrayLiteralExpr($ctx)
     {
-        $this->emit('mov x0, xzr', 'array literal — pendiente Fase 3');
+        // Fase 3: generar múltiples str para inicialización
+        $this->emit('mov x0, xzr', 'array literal — pendiente implementación completa');
         return 'array';
+    }
+
+    /**
+     * Formatea los índices como string para comentarios.
+     * Ejemplo: [0][5][2]
+     */
+    private function formatArrayIndices(array $indices): string
+    {
+        $result = '';
+        for ($i = 0; $i < count($indices); $i++) {
+            $result .= '[idx' . $i . ']';
+        }
+        return $result;
+    }
+
+    /**
+     * Calcula el offset dinámico de un array multidimensional (para lectura).
+     * (Mismo algoritmo que ArrayAssignment::computeArrayOffset)
+     * 
+     * Precondición: índices guardados en stack
+     * Postcondición: x1 = offset dinámico en bytes
+     */
+    private function computeReadArrayOffset(array $indices, array $dims): void
+    {
+        $numIndices = count($indices);
+
+        if ($numIndices === 1) {
+            $this->emit('ldr x1, [sp]', 'índice 0 ← stack');
+            $this->emit('add sp, sp, #16');
+            $this->emit('lsl x1, x1, #3', 'offset = idx * 8');
+            return;
+        }
+
+        // Multidimensional: row-major
+        $this->emit('mov x1, xzr', 'x1 = offset acumulador');
+
+        for ($i = 0; $i < $numIndices; $i++) {
+            $this->emit('ldr x4, [sp]', "índice $i ← stack");
+            $this->emit('add sp, sp, #16');
+
+            $stride = 1;
+            for ($j = $i + 1; $j < count($dims); $j++) {
+                $stride *= $dims[$j];
+            }
+
+            if ($stride > 1) {
+                $this->emit("mov x5, #$stride", "stride = $stride");
+                $this->emit('mul x4, x4, x5', "idx[$i] * stride");
+            }
+
+            $this->emit('add x1, x1, x4', "offset += idx[$i] * stride");
+        }
+
+        $this->emit('lsl x1, x1, #3', 'offset *= 8');
     }
 }

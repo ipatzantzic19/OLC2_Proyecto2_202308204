@@ -62,7 +62,21 @@ trait Prescan
         if (str_ends_with($class, 'VarDeclSimpleContext') ||
             str_ends_with($class, 'VarDeclWithInitContext')) {
             $type = $this->resolveTypeFromCtx($ctx);
-            $this->prescanIdList($ctx->idList(), $type);
+            
+            // Verificar si es un tipo array: [N]T o [N][M]T, etc.
+            $arrayDims = $this->extractArrayDimensions($ctx->type());
+            
+            if (!empty($arrayDims)) {
+                // Es un array: registrar cada ID como array con las dimensiones
+                $elemType = $this->extractArrayElementType($ctx->type());
+                for ($i = 0; $i < $ctx->idList()->getChildCount(); $i += 2) {
+                    $name = $ctx->idList()->getChild($i)->getText();
+                    $this->prescanArrayVar($name, $arrayDims, $elemType);
+                }
+            } else {
+                // Es una variable escalar: usar prescanIdList como antes
+                $this->prescanIdList($ctx->idList(), $type);
+            }
             return;
         }
 
@@ -104,6 +118,8 @@ trait Prescan
     /**
      * Registra cada identificador de la lista en el FunctionContext.
      * Si ya existe (re-declaración en scope externo), lo ignora.
+     * 
+     * Para arrays, detecta el tipo ArrayType y registra con allocArray.
      */
     protected function prescanIdList($idList, string $type): void
     {
@@ -111,9 +127,29 @@ trait Prescan
 
         for ($i = 0; $i < $idList->getChildCount(); $i += 2) {
             $name = $idList->getChild($i)->getText();
-            if ($this->func && !$this->func->hasLocal($name)) {
+            if ($this->func && !$this->func->hasLocal($name) && !$this->func->hasArray($name)) {
+                // Verificar si es un array type por medio de examinar la estructura del tipoctx
+                // Por ahora, registrar como variable escalar
+                // (Fase 3: expandir para soportar ArrayType explícitamente)
                 $this->func->allocLocal($name, $type);
             }
+        }
+    }
+
+    /**
+     * Registra un array multidimensional con todas sus dimensiones.
+     * 
+     * Ejemplo: var m [2][3]int32
+     *          → calloc prescanArrayVar('m', [[2], [3]], 'int32')
+     *
+     * @param string $name        nombre del array (ej: "matrix")
+     * @param array  $dims        lista de dimensiones [2, 3, ...] para [2][3]..., etc.
+     * @param string $elemType    tipo de elemento ('int32', 'float32', 'bool', 'string', 'rune')
+     */
+    protected function prescanArrayVar(string $name, array $dims, string $elemType): void
+    {
+        if ($this->func && !$this->func->hasArray($name) && !$this->func->hasLocal($name)) {
+            $this->func->allocArray($name, $dims, $elemType);
         }
     }
 
@@ -129,5 +165,149 @@ trait Prescan
         } catch (\Throwable $e) {
             return 'int32';
         }
+    }
+
+    /**
+     * Extrae las dimensiones de un tipo array.
+     * 
+     * Ejemplo:
+     *   [10]int32      → [10]
+     *   [2][3]float32  → [2, 3]
+     *   [5]int32       → [5]
+     *
+     * @param object $typeCtx Contexto de tipo ANTLR
+     * @return array dimensiones extraídas, [] si no es array
+     */
+    private function extractArrayDimensions($typeCtx): array
+    {
+        if ($typeCtx === null) return [];
+
+        $dims = [];
+        try {
+            $current = $typeCtx;
+            $visits = 0;
+            $maxVisits = 100;  // Prevenir loops infinitos
+
+            // Recorrer la cadena de tipos mientras tengamos un tipo
+            while ($current !== null && $visits < $maxVisits) {
+                $visits++;
+                $class = get_class($current);
+                $base  = substr($class, strrpos($class, '\\') + 1);
+
+                // Detectar ArrayType específicamente
+                if ($base === 'ArrayTypeContext') {
+                    // Extraer la expresión (dimensión)
+                    $expr = null;
+                    try {
+                        if (is_callable([$current, 'expression'])) {
+                            $expr = $current->expression();
+                        }
+                    } catch (\Throwable $e) {
+                        // Si no tiene expression, saltar
+                    }
+
+                    if ($expr !== null) {
+            // Es un ArrayType: extraer la dimensión
+                        $dimValue = $this->evaluateLiteralExpression($expr);
+                        if ($dimValue !== null && $dimValue > 0) {
+                            $dims[] = $dimValue;
+
+                            // Continuar con el tipo anidado
+                            if (is_callable([$current, 'type'])) {
+                                try {
+                                    $current = $current->type();
+                                } catch (\Throwable $e) {
+                                    $current = null;
+                                }
+                            } else {
+                                $current = null;
+                            }
+                        } else {
+                            // Expresión no evaluable, terminar
+                            break;
+                        }
+                    } else {
+                        // No tiene expression, terminar
+                        break;
+                    }
+                } else {
+                    // No es ArrayType, terminar
+                    break;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Si hay error, asumir que no es array
+            return [];
+        }
+
+        return $dims;
+    }
+
+    /**
+     * Extrae el tipo de elemento base de un tipo array.
+     * 
+     * Ejemplo:
+     *   [10]int32      → 'int32'
+     *   [2][3]float32  → 'float32'
+     *
+     * @param object $typeCtx Contexto de tipo ANTLR
+     * @return string tipo de elemento (o 'int32' por defecto)
+     */
+    private function extractArrayElementType($typeCtx): string
+    {
+        if ($typeCtx === null) return 'int32';
+
+        try {
+            $current = $typeCtx;
+
+            // Navegar hasta el último tipo (base, no array)
+            while ($current !== null) {
+                $class = get_class($current);
+
+                if (str_ends_with($class, 'ArrayTypeContext')) {
+                    // Ir al tipo anidado
+                    if (is_callable([$current, 'type'])) {
+                        $current = $current->type();
+                    } else {
+                        break;
+                    }
+                } else {
+                    // No es array, este es el tipo base
+                    return $this->getTypeName($current);
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        return 'int32';
+    }
+
+    /**
+     * Intenta evaluar una expresión literal para obtener su valor numérico.
+     * 
+     * Soporta: INT32 literals
+     * 
+     * @param object $exprCtx Contexto de expresión ANTLR
+     * @return int|null valor si es literal, null en otro caso
+     */
+    private function evaluateLiteralExpression($exprCtx): ?int
+    {
+        try {
+            $class = get_class($exprCtx);
+
+            // Si es una expresión simple que contiene un INT32
+            if (str_ends_with($class, 'IntLiteralContext')) {
+                return (int)$exprCtx->INT32()->getText();
+            }
+
+            // Si es un contexto de expresión que contiene un INT32 directo
+            if (is_callable([$exprCtx, 'INT32'])) {
+                $intToken = $exprCtx->INT32();
+                if ($intToken !== null) {
+                    return (int)$intToken->getText();
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        return null;
     }
 }

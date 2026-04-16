@@ -39,6 +39,19 @@ trait VarDecl
 
         for ($i = 0; $i < $idList->getChildCount(); $i += 2) {
             $name   = $idList->getChild($i)->getText();
+            
+            // ── Verificar si es un array ────────────────────────────────────────
+            if ($this->func && $this->func->hasArray($name)) {
+                // Es un array: prescan ya lo registró, no generar código
+                $arrayInfo = $this->func->getArrayInfo($name);
+                if ($arrayInfo !== null) {
+                    $this->comment("var $name [" . implode('][', $arrayInfo['dims']) . "]" . $arrayInfo['elem_type'] . " (ya alocado en prescan)");
+                    $this->addSymbol($name, 'array', $this->func->name, null, $line, $col);
+                }
+                continue;
+            }
+
+            // ── Variable escalar: inicializar ──────────────────────────────────
             $offset = $this->allocVar($name, $type, $line, $col);
             if ($offset === null) continue;
 
