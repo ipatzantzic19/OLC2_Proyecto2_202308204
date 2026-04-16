@@ -158,56 +158,37 @@ trait ArithmeticOps
     }
 
     /**
-     * Genera operación binaria float32 OPTIMIZADA sin spill innecesario.
+     * Genera operación binaria float32 con gestión de pila (temporales).
      * 
-     * Usa RegisterAllocator para asignar registros óptimos basado en
-     * análisis de interferencia (AHU Cap. 8-9).
-     * 
-     * Precondición: lhs ya evaluado en s0
-     * Postcondición: resultado en s0
+     * Estrategia: 
+     *   lhs ya está en s0 (precondición de emitAddSub/emitMulDivMod)
+     *   1. pushFloatStack (guarda s0 en stack)
+     *   2. evalúa rhs → s0
+     *   3. convierte rhs si es int → float
+     *   4. popFloatStack (recupera lhs en s1)
+     *   5. emitFloatBinaryOp (fadd/fsub/fmul/fdiv con s0, s1)
+     *
+     * Postcondición: resultado en s0, tipo float32
      */
     private function emitFloatBinaryExpr(string $op, $rhsCtx): string
     {
-        // Obtener asignación óptima de registros
-        $allocation = $this->allocateRegisterPair('float32');
-        $lhsReg = $allocation['lhs'];  // Típicamente s0
-        $rhsReg = $allocation['rhs'];  // Típicamente s1
-
         // s0 ya contiene lhs (precondición)
-        // Si lhsReg != s0, mover resulta
-        if ($lhsReg !== 's0') {
-            $this->emit("fmov $lhsReg, s0", 'mover lhs a registro asignado');
-        }
+        $this->pushFloatStack();
 
         // Evaluar rhs → s0
         $rhsType = $this->visit($rhsCtx);
 
         // Si rhs necesita conversión int32 → float32
         if ($rhsType === 'int32' || $rhsType === 'rune') {
-            $this->emitIntToFloat();  // Convierte s0 en float32
+            // s0 contiene int en x0; hay que convertir el valor entero a float
+            $this->emit('scvtf s0, w0', 'rhs int32 → float32');
         }
 
-        // Si rhsReg != s0, mover resultado
-        if ($rhsReg !== 's0') {
-            $this->emit("fmov $rhsReg, s0", 'mover rhs a registro asignado');
-        }
+        // Recuperar lhs del stack en s1
+        $this->popFloatStack();
 
-        // Emitir operación binaria SIN spill
-        // Nota: emitFloatBinaryOp usa s0, s1 por defecto,
-        // pero como asignamos optimalmente, evitamos push/pop
-        match ($op) {
-            '+'  => $this->emit("fadd $lhsReg, $lhsReg, $rhsReg", 'float32 suma optimizada'),
-            '-'  => $this->emit("fsub $lhsReg, $lhsReg, $rhsReg", 'float32 resta optimizada'),
-            '*'  => $this->emit("fmul $lhsReg, $lhsReg, $rhsReg", 'float32 multiplicación optimizada'),
-            '/'  => $this->emit("fdiv $lhsReg, $lhsReg, $rhsReg", 'float32 división optimizada'),
-            default => null,
-        };
-
-        // Resultado en lhsReg (típicamente s0)
-        // Si lhsReg != s0, mover resultado a s0 para consistencia
-        if ($lhsReg !== 's0') {
-            $this->emit("fmov s0, $lhsReg", 'mover resultado a s0');
-        }
+        // Emitir operación: s0 = s1 op s0
+        $this->emitFloatBinaryOp($op);
 
         return 'float32';
     }

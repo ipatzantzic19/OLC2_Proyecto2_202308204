@@ -63,7 +63,7 @@ trait AssemblyBuilder
 
         // ── Sección .text ─────────────────────────────────────────────────
         $lines[] = '.section .text';
-        $lines[] = '.global _start';
+        $lines[] = '.global main';
         $lines[] = '';
         foreach ($this->textLines as $l) {
             $lines[] = $l;

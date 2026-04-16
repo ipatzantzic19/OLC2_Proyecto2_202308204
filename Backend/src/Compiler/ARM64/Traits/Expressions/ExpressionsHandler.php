@@ -7,12 +7,14 @@ use Golampi\Compiler\ARM64\Traits\Expressions\LogicalOps;
 use Golampi\Compiler\ARM64\Traits\Expressions\Comparisons;
 use Golampi\Compiler\ARM64\Traits\Expressions\ArithmeticOps;
 use Golampi\Compiler\ARM64\Traits\Expressions\UnaryOps;
+use Golampi\Compiler\ARM64\Traits\FloatOps\FloatArithmetic;
 
 require_once __DIR__ . '/ExpressionEntry.php';
 require_once __DIR__ . '/LogicalOps.php';
 require_once __DIR__ . '/Comparisons.php';
 require_once __DIR__ . '/ArithmeticOps.php';
 require_once __DIR__ . '/UnaryOps.php';
+require_once __DIR__ . '/../FloatOps/FloatArithmetic.php';
 
 /**
  * ExpressionsTrait — Orquestador de la fase de generación de expresiones
@@ -59,6 +61,7 @@ trait ExpressionsHandler
 
     // ── Operadores aritméticos ────────────────────────────────────────────
     use ArithmeticOps;     // +, -, *, /, % con tabla de promoción
+    use FloatArithmetic;   // pushFloatStack, popFloatStack, emitFloatBinaryOp
 
     // ── Operadores unarios (mayor precedencia) ────────────────────────────
     use UnaryOps;          // -, !, &ID, *ptr, (expr), array access
