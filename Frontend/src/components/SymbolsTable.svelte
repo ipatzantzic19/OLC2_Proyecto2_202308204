@@ -7,8 +7,8 @@
     <table class="symbols-table">
       <thead>
         <tr>
-          <th>Identificador</th><th>Tipo</th><th>Valor</th>
-          <th>Ámbito</th><th>Línea</th><th>Columna</th>
+          <th>Identificador</th><th>Tipo</th><th>Dimensiones</th>
+          <th>Ámbito</th><th>Offset</th><th>Línea</th>
         </tr>
       </thead>
       <tbody>
@@ -16,10 +16,10 @@
           <tr>
             <td class="id">{sym.identifier}</td>
             <td class="type">{sym.type}</td>
-            <td class="value">{sym.value ?? '—'}</td>
-            <td class="scope">{sym.scope}</td>
-            <td class="center muted">{sym.line}</td>
-            <td class="center muted">{sym.column}</td>
+            <td class="dims">{sym.scope === 'array' && sym.dims ? `[${sym.dims.join('][')}]` : '—'}</td>
+            <td class="scope">{sym.scope || sym.function || '—'}</td>
+            <td class="center muted">{sym.offset ?? '—'}</td>
+            <td class="center muted">{sym.line ?? '—'}</td>
           </tr>
         {/each}
       </tbody>
@@ -43,7 +43,7 @@
   .muted  { color: #858585; }
   .id     { color: #4A9EFF; font-family: 'Consolas', monospace; }
   .type   { color: #6A9955; }
-  .value  { color: #CE9178; font-family: 'Consolas', monospace; }
+  .dims   { color: #CE9178; font-family: 'Consolas', monospace; }
   .scope  { color: #9CDCFE; }
   .empty  { display: flex; align-items: center; justify-content: center;
             padding: 40px 20px; color: #858585; font-size: 13px; }

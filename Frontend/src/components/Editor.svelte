@@ -96,7 +96,15 @@
       const result = await compileCode($editorCode);
       assemblyCode.set(result.assembly ?? '');
       compileErrors.set(result.errors ?? []);
-      compileSymbols.set(result.symbolTable ?? []);
+      
+      // Convertir symbolTable (objeto asociativo) a array de símbolos
+      const symbolTableObj = result.symbolTable ?? {};
+      const symbolsArray = Object.entries(symbolTableObj).map(([key, value]) => ({
+        identifier: key,
+        ...(value && typeof value === 'object' ? value : {}),
+      })).filter(sym => sym.type !== undefined); // Filtrar entradas sin type
+      
+      compileSymbols.set(symbolsArray);
       compileSuccess.set(result.success);
       compTime = result.executionTime ?? '0ms';
       if (result.success) {
@@ -121,7 +129,19 @@
   }
 
   async function showErrors()  { const r = await fetchCompileErrors();  if (r?.success) compileErrors.set(r.errors ?? []);       modalContent = 'errors';  isModalOpen = true; }
-  async function showSymbols() { const r = await fetchCompileSymbols(); if (r?.success) compileSymbols.set(r.symbolTable ?? []); modalContent = 'symbols'; isModalOpen = true; }
+  async function showSymbols() { 
+    const r = await fetchCompileSymbols(); 
+    if (r?.success) {
+      const symbolTableObj = r.symbolTable ?? {};
+      const symbolsArray = Object.entries(symbolTableObj).map(([key, value]) => ({
+        identifier: key,
+        ...(value && typeof value === 'object' ? value : {}),
+      })).filter(sym => sym.type !== undefined);
+      compileSymbols.set(symbolsArray);
+    }
+    modalContent = 'symbols'; 
+    isModalOpen = true; 
+  }
 
   function clearAll() { consoleOutput.set([]); assemblyCode.set(''); compileErrors.set([]); compileSymbols.set([]); compileSuccess.set(null); compTime = '0ms'; }
   function newFile()  {
