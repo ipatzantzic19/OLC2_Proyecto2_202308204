@@ -3,52 +3,36 @@
 namespace Golampi\Traits;
 
 /**
- * Trait compartido entre el intérprete (P1) y el compilador (P2).
- *
- * Estandariza la captura de errores ANTLR4 en el formato
- * { type, description, line, column } usado por la GUI.
+ * ErrorHandler - Trait mínimo para gestión de errores ANTLR
+ * 
+ * Utilizado por CompilationHandler para registrar errores léxicos y sintácticos
  */
 trait ErrorHandler
 {
-    private array $_errors = [];
+    protected array $errors = [];
 
     /**
-     * Añade un error ANTLR4 normalizado.
-     * Se llama desde syntaxError() del ErrorListener.
+     * Registra un error detectado por ANTLR (léxico o sintáctico)
      */
-    protected function addAntlrError(
-        $recognizer,
+    public function addAntlrError(
+        \Antlr\Antlr4\Runtime\Recognizer $recognizer,
         string $msg,
         int $line,
-        int $col
+        int $charPositionInLine
     ): void {
-        $type = ($recognizer instanceof \Antlr\Antlr4\Runtime\Parser)
-            ? 'Sintáctico'
-            : 'Léxico';
-
-        // Limpiar mensaje ANTLR (elimina "token recognition error at:" etc.)
-        $desc = $msg;
-        if (str_contains($msg, "token recognition error at:")) {
-            $char = trim(str_replace("token recognition error at:", '', $msg));
-            $desc = "Carácter no reconocido: $char";
-        } elseif (str_contains($msg, "mismatched input")) {
-            $desc = "Entrada incorrecta — $msg";
-        } elseif (str_contains($msg, "missing")) {
-            $desc = "Token faltante — $msg";
-        } elseif (str_contains($msg, "extraneous input")) {
-            $desc = "Token inesperado — $msg";
-        }
-
-        $this->_errors[] = [
-            'type'        => $type,
-            'description' => $desc,
+        $this->errors[] = [
+            'type'        => 'Sintáctico',
+            'description' => $msg,
             'line'        => $line,
-            'column'      => $col,
+            'column'      => $charPositionInLine + 1,
         ];
     }
 
+    /**
+     * Retorna todos los errores registrados
+     */
     public function getErrors(): array
     {
-        return $this->_errors;
+        return $this->errors;
     }
 }

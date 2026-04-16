@@ -1,0 +1,65 @@
+# Golampi Project .gitignore
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# DIRECTAMENTE IGNORADOS - Nunca deben ser versionados
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Directorios generados por ANTLR
+.antlr/
+*.interp
+*.tokens
+
+# Compilación local
+*.o
+*.obj
+*.exe
+programa
+test_*_bin
+test_loop_bin
+program.o
+
+# Ejecutables generados
+*.elf
+*.bin
+*.asm
+
+# Archivos temporales de desarrollo
+*.tmp
+*.temp
+*.log
+*~
+*.swp
+*.swo
+
+# IDE y editor
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+.directory
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CONFIGURACIÓN IMPORTANTE - Solo ignorar localmente si es necesario
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Herramientas ANTLR (usar desde npm o distribution)
+# antlr4.jar  # ← Comentado: mantener si el build lo necesita
+
+# Composer (opcional - algunos prefieren incluir vendor/)
+# vendor/     # ← Comentado: incluir para reproducibilidad
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# IMPORTANTE - NUNCA IGNORAR (requeridos para el proyecto)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ✓ Estos DEBEN estar versionados:
+# - generated/        (código ANTLR generado, estabilidad reproducible)
+# - vendor/          (dependencias PHP, reproducibilidad)
+# - Golampi.g4       (gramática del lenguaje)
+# - composer.json    (dependencias)
+# - src/             (código fuente)
+# - test/            (tests unitarios)
