@@ -67,7 +67,7 @@ trait GenerationPhase
         if (!isset($this->func)) return;
 
         // Etiqueta de función
-        $this->emitLabel($label);
+        $this->label($label);
 
         // Guardar x29 (FP) y x30 (LR) con decremento automático de stack
         $this->emit('stp x29, x30, [sp, #-16]!');
@@ -88,7 +88,51 @@ trait GenerationPhase
             $this->emit("sub sp, sp, #{$frameSize}");
         }
 
-        $this->emitComment("frame.size=" . $frameSize . ", locals=" . count($this->func->getLocals()));
+        // Guardar parámetros (que llegan en x0, x1, ..., x7)
+        $this->phaseGenerateSaveParameters();
+
+        $this->comment("frame.size=" . $frameSize . ", locals=" . count($this->func->getLocals()));
+    }
+
+    /**
+     * Genera instrucciones para guardar parámetros del registro al stack.
+     * Los parámetros enteros llegan en x0-x7.
+     */
+    protected function phaseGenerateSaveParameters(): void
+    {
+        if (!isset($this->func)) return;
+
+        $locals = $this->func->getLocals();
+        $paramRegister = 0;  // x0 para primer parámetro, x1 para segundo, etc.
+
+        // Iterar sobre locales en orden de offset (primeros son parámetros)
+        $sortedLocals = [];
+        foreach ($locals as $name => $info) {
+            $sortedLocals[$info['offset']] = ['name' => $name, 'type' => $info['type']];
+        }
+        ksort($sortedLocals);
+
+        foreach ($sortedLocals as $offset => $varInfo) {
+            if ($paramRegister >= 8) break;  // Solo x0-x7 para parámetros enteros
+
+            $name = $varInfo['name'];
+            $type = $varInfo['type'];
+
+            // Validar que el tipo es entero (int32, int8, int16, etc.)
+            if (in_array($type, ['int32', 'int8', 'int16', 'int64', 'rune'])) {
+                // Generar instrucción para guardar parámetro
+                $reg = 'x' . $paramRegister;
+                $negOffset = -$offset;
+                $this->emit("str {$reg}, [x29, #{$negOffset}]", "param {$name}");
+                $paramRegister++;
+            } elseif (in_array($type, ['float32', 'float64'])) {
+                // Parámetros float llegan en s0-s7 (float32) o d0-d7 (float64)
+                $sreg = ($type === 'float32') ? 's' . $paramRegister : 'd' . $paramRegister;
+                $negOffset = -$offset;
+                $this->emit("str {$sreg}, [x29, #{$negOffset}]", "param float {$name}");
+                $paramRegister++;
+            }
+        }
     }
 
     /**
@@ -130,20 +174,35 @@ trait GenerationPhase
      * @param object $blockCtx contexto del bloque (body)
      * @param FunctionContext $funcCtx contexto de la función
      */
-    protected function phaseGenerateFunction(string $label, $blockCtx, $funcCtx): void
+    protected function phaseGenerateFunction(string $label, $funcCtx, $functionContext): void
     {
         // Cambiar contexto de función
         $oldFunc = $this->func;
-        $this->func = $funcCtx;
+        $this->func = $functionContext;
 
-        // Prescan: registrar variables
-        $this->phasePrescanBlock($blockCtx);
+        // Prescan de parámetros (si la función los tiene)
+        $this->phasePrescanFunctionParams($funcCtx);
+
+        // Extraer bloque
+        $blockCtx = null;
+        if (method_exists($funcCtx, 'block')) {
+            try {
+                $blockCtx = $funcCtx->block();
+            } catch (\Throwable $e) {}
+        }
+
+        // Prescan: registrar variables del bloque
+        if ($blockCtx !== null) {
+            $this->phasePrescanBlock($blockCtx);
+        }
 
         // Generar prólogo
         $this->phaseGeneratePrologue($label);
 
         // Generar código del body (delega a ExpressionsHandler, ControlFlowHandler, etc.)
-        $this->phaseGenerateBlock($blockCtx);
+        if ($blockCtx !== null) {
+            $this->phaseGenerateBlock($blockCtx);
+        }
 
         // Generar epílogo
         $this->phaseGenerateEpilogue();
@@ -153,33 +212,146 @@ trait GenerationPhase
     }
 
     /**
+     * Prescan de parámetros de función.
+     * Registra cada parámetro como variable local en el stack.
+     */
+    protected function phasePrescanFunctionParams($funcCtx): void
+    {
+        if (!isset($this->func)) return;
+
+        // Intentar obtener parámetros
+        $params = null;
+        if (method_exists($funcCtx, 'parameterList')) {
+            try {
+                $params = $funcCtx->parameterList();
+            } catch (\Throwable $e) {}
+        }
+
+        if ($params === null) {
+            return;
+        }
+
+        // Registrar cada parámetro
+        for ($i = 0; $i < $params->getChildCount(); $i++) {
+            $child = $params->getChild($i);
+
+            // Saltar comas y otros tokens
+            if ($child instanceof \TerminalNode) {
+                continue;
+            }
+
+            $fullClass = get_class($child);
+            $class = substr($fullClass, strrpos($fullClass, '\\') + 1);
+
+            if ($class === 'NormalParameterContext') {
+                // NormalParameter: ID type
+                $paramName = null;
+                
+                // Intento 1: ID() (token)
+                if (is_callable([$child, 'ID'])) {
+                    try {
+                        $id = $child->ID();
+                        if ($id !== null) {
+                            $paramName = $id->getText();
+                        }
+                    } catch (\Throwable $e) {}
+                }
+
+                if ($paramName !== null) {
+                    // Extraer tipo
+                    $paramType = 'int32';
+                    if (method_exists($child, 'type')) {
+                        try {
+                            $typeCtx = $child->type();
+                            if ($typeCtx !== null) {
+                                $paramType = $this->getTypeName($typeCtx);
+                            }
+                        } catch (\Throwable $e) {}
+                    }
+
+                    // Registrar como variable local
+                    $this->func->allocLocal($paramName, $paramType);
+                }
+            }
+        }
+    }
+
+    /**
      * Genera una tabla de símbolos para depuración (versión fase).
      * Llamada al final de generateProgram para registrar todas las variables.
      */
     protected function phaseGenerateSymbolTable(): void
     {
-        if (!isset($this->func)) return;
+        // Este método es llamado después de compilar todas las funciones
+        // Necesita generar símbolos usando la información almacenada en
+        // phaseCompileProgram (acceso a objetos FunctionContext guardados)
 
-        $locals = $this->func->getLocals();
-        $arrays = $this->func->getArrays();
+        // Si tenemos acceso a userFunctions (desde ProgramPhase), usarla
+        if (isset($this->userFunctionContexts) && is_array($this->userFunctionContexts)) {
+            foreach ($this->userFunctionContexts as $funcName => $funcCtx) {
+                $this->addFunctionSymbols($funcCtx, $funcName);
+            }
+        }
 
-        // Registrar variables locales
+        // Si no, intentar usar $this->func si existe
+        if (!isset($this->userFunctionContexts) && isset($this->func)) {
+            $locals = $this->func->getLocals();
+            $arrays = $this->func->getArrays();
+
+            // Registrar variables locales
+            foreach ($locals as $name => $info) {
+                $this->symbolTable[$name] = [
+                    'type'   => $info['type'] ?? 'int32',
+                    'offset' => $info['offset'] ?? 0,
+                    'scope'  => 'local',
+                ];
+            }
+
+            // Registrar arrays
+            foreach ($arrays ?? [] as $name => $info) {
+                $this->symbolTable[$name] = [
+                    'type'   => $info['elem_type'] ?? 'int32',
+                    'offset' => $info['base_offset'] ?? 0,
+                    'scope'  => 'array',
+                    'dims'   => $info['dims'] ?? [],
+                ];
+            }
+        }
+    }
+
+    /**
+     * Agrega símbolos de una función a la tabla de símbolos.
+     */
+    protected function addFunctionSymbols($funcCtx, string $funcName): void
+    {
+        // Agregar función misma
+        $this->symbolTable[$funcName] = [
+            'type'   => 'function',
+            'scope'  => 'global',
+        ];
+
+        // Agregar variables locales de la función
+        $locals = $funcCtx->getLocals();
         foreach ($locals as $name => $info) {
             $this->symbolTable[$name] = [
                 'type'   => $info['type'] ?? 'int32',
                 'offset' => $info['offset'] ?? 0,
                 'scope'  => 'local',
+                'function' => $funcName,
             ];
         }
 
-        // Registrar arrays
+        // Agregar arrays de la función
+        $arrays = $funcCtx->getArrays();
         foreach ($arrays ?? [] as $name => $info) {
             $this->symbolTable[$name] = [
                 'type'   => $info['elem_type'] ?? 'int32',
                 'offset' => $info['base_offset'] ?? 0,
                 'scope'  => 'array',
                 'dims'   => $info['dims'] ?? [],
+                'function' => $funcName,
             ];
         }
     }
 }
+

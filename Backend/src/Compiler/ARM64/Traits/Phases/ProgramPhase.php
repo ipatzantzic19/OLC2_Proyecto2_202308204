@@ -37,21 +37,35 @@ trait ProgramPhase
 
         // Fase 2: Generar código para main
         if (!isset($this->userFunctions['main'])) {
-            $this->errors[] = 'Error: función main no encontrada';
-            return new CompilationResult(null, $this->errors, $this->symbolTable);
+            $this->errors[] = [
+                'type'        => 'Fatal',
+                'description' => 'No se encontró la función main()',
+                'line'        => 0,
+                'column'      => 0,
+            ];
+            return new \Golampi\Compiler\CompilationResult('', $this->errors, $this->symbolTable);
         }
 
         $mainFunc = $this->userFunctions['main'];
-        $mainCtx = new FunctionContext('main');
+        $mainCtx = new \Golampi\Compiler\ARM64\FunctionContext('main');
 
-        $this->phaseGenerateFunction('main', $mainFunc['block'], $mainCtx);
+        $this->phaseGenerateFunction('main', $mainFunc['ctx'], $mainCtx);
+        
+        // Guardar contexto para tabla de símbolos
+        if (!isset($this->userFunctionContexts)) {
+            $this->userFunctionContexts = [];
+        }
+        $this->userFunctionContexts['main'] = $mainCtx;
 
         // Fase 3: Generar código para funciones de usuario
         foreach ($this->userFunctions as $name => $funcInfo) {
             if ($name === 'main') continue; // Ya generada
 
-            $funcCtx = new FunctionContext($name);
-            $this->phaseGenerateFunction($name, $funcInfo['block'], $funcCtx);
+            $funcCtx = new \Golampi\Compiler\ARM64\FunctionContext($name);
+            $this->phaseGenerateFunction($name, $funcInfo['ctx'], $funcCtx);
+            
+            // Guardar contexto para tabla de símbolos
+            $this->userFunctionContexts[$name] = $funcCtx;
         }
 
         // Fase 4: Generar tabla de símbolos para depuración
@@ -63,7 +77,7 @@ trait ProgramPhase
         // Fase 6: Construir assembly final
         $assembly = $this->buildAssembly();
 
-        return new CompilationResult($assembly, $this->errors, $this->symbolTable);
+        return new \Golampi\Compiler\CompilationResult($assembly, $this->errors, $this->symbolTable);
     }
 
     /**
@@ -84,32 +98,83 @@ trait ProgramPhase
                 continue;
             }
 
-            $class = class_basename($child);
-            if ($class === 'FunctionDeclContext') {
+            $fullClass = get_class($child);
+            $class = substr($fullClass, strrpos($fullClass, '\\') + 1);
+            
+            // Buscar función en DeclarationContext o directamente en FunctionDeclContext
+            if ($class === 'DeclarationContext') {
+                // Buscar función dentro de Declaration
+                for ($j = 0; $j < $child->getChildCount(); $j++) {
+                    $decChild = $child->getChild($j);
+                    if ($decChild instanceof \TerminalNode) continue;
+                    
+                    $funcDecl = $this->extractFuncFromContext($decChild);
+                    if ($funcDecl !== null) {
+                        $this->registerUserFunction($funcDecl);
+                        break;
+                    }
+                }
+            } elseif ($class === 'FunctionDeclContext') {
                 $this->registerUserFunction($child);
             }
         }
     }
 
     /**
+     * Extrae una declaración de función de un contexto.
+     * @return object|null FlatUserFunction context o null
+     */
+    private function extractFuncFromContext($ctx): ?object
+    {
+        try {
+            if (is_callable([$ctx, 'functionDeclaration'])) {
+                $fd = $ctx->functionDeclaration();
+                if ($fd !== null) return $fd;
+            }
+            // Si el contexto ya es una función (tiene ID y block)
+            if (is_callable([$ctx, 'ID']) && is_callable([$ctx, 'block'])) {
+                return $ctx;
+            }
+        } catch (\Throwable $e) {}
+        return null;
+    }
+
+    /**
      * Registra una declaración de función en $this->userFunctions.
      * Se llama durante prescan global.
      *
-     * @param object $funcDeclCtx FunctionDeclContext
+     * @param object $funcDeclCtx FunctionDeclContext o FuncDeclSingleReturnContext
      */
     protected function registerUserFunction($funcDeclCtx): void
     {
-        if (!method_exists($funcDeclCtx, 'identifier')) {
+        // Intentar extraer nombre de identifier() (FunctionDeclContext)
+        $name = null;
+        if (method_exists($funcDeclCtx, 'identifier')) {
+            try {
+                $nameCtx = $funcDeclCtx->identifier();
+                $name = $nameCtx->getText();
+            } catch (\Throwable $e) {}
+        }
+        
+        // Si no, intentar extraer de ID() (FuncDeclSingleReturnContext)
+        if ($name === null && is_callable([$funcDeclCtx, 'ID'])) {
+            try {
+                $idToken = $funcDeclCtx->ID();
+                $name = $idToken->getText();
+            } catch (\Throwable $e) {}
+        }
+        
+        // Si no se pudo extraer nombre, salir
+        if ($name === null) {
             return;
         }
-
-        $nameCtx = $funcDeclCtx->identifier();
-        $name = $nameCtx->getText();
 
         // Extraer bloque (body)
         $blockCtx = null;
         if (method_exists($funcDeclCtx, 'block')) {
-            $blockCtx = $funcDeclCtx->block();
+            try {
+                $blockCtx = $funcDeclCtx->block();
+            } catch (\Throwable $e) {}
         }
 
         // Registrar
