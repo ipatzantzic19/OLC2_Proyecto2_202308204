@@ -109,9 +109,16 @@ trait VarDecl
      * Almacena el resultado de una expresión en el frame según el tipo.
      *   float32 → str s0, [x29, #-offset]
      *   demás   → str x0, [x29, #-offset]
+     * 
+     * OPTIMIZACIÓN: Si offset=0, no guardar (variable vive en registros).
      */
     private function storeResultTyped(string $type, int $offset): void
     {
+        if ($offset === 0) {
+            // OPTIMIZACIÓN: Variable en registro, no guardar
+            return;
+        }
+
         if ($type === 'float32') {
             $this->emit("str s0, [x29, #-$offset]", 'guardar float32');
         } else {

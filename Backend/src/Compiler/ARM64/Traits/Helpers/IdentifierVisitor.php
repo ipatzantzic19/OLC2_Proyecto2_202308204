@@ -38,6 +38,13 @@ trait IdentifierVisitor
         $offset = $this->func->getOffset($name);
         $type   = $this->func->getType($name);
 
+        // OPTIMIZACIÓN: Si offset=0, la variable vive en registros (no cargar)
+        if ($offset === 0) {
+            // Variable sin offset → ya está en el registro correcto de algún cálculo anterior
+            // NO hacer ldr, asumir que está en x0/s0
+            return $type;
+        }
+
         if ($type === 'float32') {
             $this->emit("ldr s0, [x29, #-$offset]", "$name (float32)");
         } else {

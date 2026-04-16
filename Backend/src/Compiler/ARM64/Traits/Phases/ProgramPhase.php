@@ -35,7 +35,7 @@ trait ProgramPhase
         // Fase 1: Prescan global de funciones (hoisting)
         $this->phasePrescanGlobalFunctions($programCtx);
 
-        // Fase 2: Generar código para main
+        // Fase 2: Generar código para _start (bare-metal)
         if (!isset($this->userFunctions['main'])) {
             $this->errors[] = [
                 'type'        => 'Fatal',
@@ -47,19 +47,19 @@ trait ProgramPhase
         }
 
         $mainFunc = $this->userFunctions['main'];
-        $mainCtx = new \Golampi\Compiler\ARM64\FunctionContext('main');
+        $mainCtx = new \Golampi\Compiler\ARM64\FunctionContext('_start');
 
-        $this->phaseGenerateFunction('main', $mainFunc['ctx'], $mainCtx);
+        $this->phaseGenerateFunction('_start', $mainFunc['ctx'], $mainCtx);
         
         // Guardar contexto para tabla de símbolos
         if (!isset($this->userFunctionContexts)) {
             $this->userFunctionContexts = [];
         }
-        $this->userFunctionContexts['main'] = $mainCtx;
+        $this->userFunctionContexts['_start'] = $mainCtx;
 
         // Fase 3: Generar código para funciones de usuario
         foreach ($this->userFunctions as $name => $funcInfo) {
-            if ($name === 'main') continue; // Ya generada
+            if ($name === 'main') continue; // Ya generada como _start
 
             $funcCtx = new \Golampi\Compiler\ARM64\FunctionContext($name);
             $this->phaseGenerateFunction($name, $funcInfo['ctx'], $funcCtx);

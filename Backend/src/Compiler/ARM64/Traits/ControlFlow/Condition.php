@@ -37,6 +37,54 @@ namespace Golampi\Compiler\ARM64\Traits\ControlFlow;
  */
 trait Condition
 {
+    /**
+     * Label de salto para condición directa (cuando está dentro de if).
+     * Si está set, las comparaciones emiten saltos directos en lugar de bools.
+     */
+    private ?string $conditionalJumpLabel = null;
+    private ?bool   $conditionalJumpInverted = null;
+
+    /**
+     * Establece el contexto de salto condicional para que las comparaciones
+     * generen saltos directos en lugar de bools.
+     */
+    private function setConditionalJumpContext(string $label, bool $inverted = false): void
+    {
+        $this->conditionalJumpLabel = $label;
+        $this->conditionalJumpInverted = $inverted;
+    }
+
+    /**
+     * Limpia el contexto de salto condicional.
+     */
+    private function clearConditionalJumpContext(): void
+    {
+        $this->conditionalJumpLabel = null;
+        $this->conditionalJumpInverted = null;
+    }
+
+    /**
+     * Obtiene el contexto actual de salto condicional.
+     */
+    public function hasConditionalJumpContext(): bool
+    {
+        return $this->conditionalJumpLabel !== null;
+    }
+
+    /**
+     * Retorna (label, inverted) si está en contexto de salto, else null.
+     */
+    public function getConditionalJumpContext(): ?array
+    {
+        if ($this->conditionalJumpLabel === null) {
+            return null;
+        }
+        return [
+            'label'    => $this->conditionalJumpLabel,
+            'inverted' => $this->conditionalJumpInverted ?? false,
+        ];
+    }
+
     public function visitIfElseIfElse($ctx)
     {
         $conditions = $ctx->expression();  // array de condiciones
@@ -53,12 +101,14 @@ trait Condition
                 ? $endLabel
                 : $this->newLabel('else_branch');
 
-            // ── Evaluar condición ─────────────────────────────────────────
+            // ── Evaluar condición con salto directo ───────────────────────
             $this->comment('if condición #' . ($i + 1));
+            
+            // OPTIMIZACIÓN: Establecer contexto de salto directo
+            // Las comparaciones emitirán saltos en lugar de bools
+            $this->setConditionalJumpContext($nextLabel, true);  // inverted: salta si falso
             $this->visit($conditions[$i]);
-
-            // cbz: "compare and branch if zero" — salta si la condición es falsa
-            $this->emit("cbz x0, $nextLabel", 'falso → siguiente rama');
+            $this->clearConditionalJumpContext();
 
             // ── Bloque verdadero ──────────────────────────────────────────
             $this->generateBlock($blocks[$i]);

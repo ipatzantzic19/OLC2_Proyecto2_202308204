@@ -209,9 +209,17 @@ trait ShortVarDecl
     /**
      * Almacena x0 o s0 en el frame slot correspondiente según el tipo inferido.
      * Se reutiliza también en los casos normales A y B.
+     * 
+     * OPTIMIZACIÓN: Si offset=0, la variable vive en registros (no guardar al stack).
      */
     private function storeInferredResult(string $type, int $offset): void
     {
+        // OPTIMIZACIÓN: offset=0 significa "sin stack" → variable vive en registros
+        if ($offset === 0) {
+            // No guardar al stack, el valor ya está en x0/s0
+            return;
+        }
+
         if ($type === 'float32') {
             $this->emit("str s0, [x29, #-$offset]", "guardar float32 inferido");
         } else {

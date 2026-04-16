@@ -97,10 +97,18 @@ trait GenerationPhase
     /**
      * Genera instrucciones para guardar parámetros del registro al stack.
      * Los parámetros enteros llegan en x0-x7.
+     * 
+     * OPTIMIZACIÓN: NO guarda parámetros con offset=0 (que viven en registros).
+     * Tampoco guarda nada para main() (que no recibe parámetros reales).
      */
     protected function phaseGenerateSaveParameters(): void
     {
         if (!isset($this->func)) return;
+
+        // OPTIMIZACIÓN: _start (main) no tiene parámetros reales, skip
+        if ($this->func->name === '_start') {
+            return;
+        }
 
         $locals = $this->func->getLocals();
         $paramRegister = 0;  // x0 para primer parámetro, x1 para segundo, etc.
@@ -114,6 +122,11 @@ trait GenerationPhase
 
         foreach ($sortedLocals as $offset => $varInfo) {
             if ($paramRegister >= 8) break;  // Solo x0-x7 para parámetros enteros
+
+            // OPTIMIZACIÓN: Si offset=0, el parámetro vive en registros, no guardar
+            if ($offset === 0) {
+                continue;
+            }
 
             $name = $varInfo['name'];
             $type = $varInfo['type'];

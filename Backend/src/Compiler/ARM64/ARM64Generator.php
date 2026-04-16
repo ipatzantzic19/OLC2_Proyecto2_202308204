@@ -295,6 +295,12 @@ class ARM64Generator extends \GolampiBaseVisitor
     protected function generateFunction($funcDecl): void
     {
         $name = $funcDecl->ID()->getText();
+        
+        // Conversión: func main() → _start (bare-metal ARM64)
+        if ($name === 'main') {
+            $name = '_start';
+        }
+        
         $line = $funcDecl->getStart()->getLine();
         $col  = $funcDecl->getStart()->getCharPositionInLine();
 
@@ -313,7 +319,7 @@ class ARM64Generator extends \GolampiBaseVisitor
             $this->prescanBlock($funcDecl->block());
         }
 
-        // Usar main directamente (compatible con aarch64-linux-gnu-gcc)
+        // Usar _start para bare-metal
         $labelName                 = $name;
         $epilogueLabel             = '.epilogue_' . $labelName;
         $this->func->epilogueLabel = $epilogueLabel;
@@ -321,8 +327,8 @@ class ARM64Generator extends \GolampiBaseVisitor
 
         // ── Prólogo ARM64 ────────────────────────────────────────────
         $this->textLines[] = '';
-        if ($name === 'main') {
-            $this->textLines[] = '.align 3';  // Alineación de función principal
+        if ($name === '_start') {
+            $this->textLines[] = '.align 3';  // Alineación de punto de entrada
         }
         $this->textLines[] = '.global ' . $labelName;
         $this->textLines[] = '';
@@ -362,7 +368,7 @@ class ARM64Generator extends \GolampiBaseVisitor
             $this->emit("add sp, sp, #$frameSize", 'liberar espacio de locales');
         }
         $this->emit('ldp x29, x30, [sp], #16', 'restaurar fp y lr');
-        if ($name === '_start' || $name === 'main') {
+        if ($name === '_start') {
             $this->emit('mov x0, #0', 'exit code 0');
         }
         $this->emit('ret');
