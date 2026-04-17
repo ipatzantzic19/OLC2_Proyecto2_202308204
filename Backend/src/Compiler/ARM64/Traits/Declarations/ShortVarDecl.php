@@ -209,13 +209,19 @@ trait ShortVarDecl
     /**
      * Almacena x0 o s0 en el frame slot correspondiente según el tipo inferido.
      * Se reutiliza también en los casos normales A y B.
+     * 
+     * ✅ CORRECCIÓN: Usar w0 para int32/bool/rune, x0 para punteros/64-bit
      */
     private function storeInferredResult(string $type, int $offset): void
     {
         if ($type === 'float32') {
             $this->emit("str s0, [x29, #-$offset]", "guardar float32 inferido");
+        } elseif (in_array($type, ['int32', 'bool', 'rune'])) {
+            // ✅ Usar w0 (32-bit) para tipos enteros
+            $this->emit("str w0, [x29, #-$offset]", "guardar $type inferido (32-bit)");
         } else {
-            $this->emit("str x0, [x29, #-$offset]", "guardar $type inferido");
+            // Puntero, string, array → x0 (64-bit)
+            $this->emit("str x0, [x29, #-$offset]", "guardar $type inferido (64-bit)");
         }
     }
 }

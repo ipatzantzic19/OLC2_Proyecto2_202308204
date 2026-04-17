@@ -69,16 +69,13 @@ trait GenerationPhase
         // Etiqueta de función
         $this->label($label);
 
-        // BARE-METAL: Si es _start, omitir prologue
-        if ($label === '_start') {
-            return;
-        }
-
+        // ✅ CORRECCIÓN: Todas las funciones (inc. _start) necesitan frame pointer si usan locales
+        // Según PDF: x29 debe inicializarse SIEMPRE si se usa para acceso a variables
         // Guardar x29 (FP) y x30 (LR) con decremento automático de stack
-        $this->emit('stp x29, x30, [sp, #-16]!');
+        $this->emit('stp x29, x30, [sp, #-16]!', 'guardar frame pointer y link register');
 
         // Establecer nuevo frame pointer
-        $this->emit('mov x29, sp');
+        $this->emit('mov x29, sp', 'x29 = frame pointer (SP actual)');
 
         // Generar prólogo de callee-saved si es necesario
         $prologue = $this->func->generateCalleeSavedProlog();
@@ -90,7 +87,7 @@ trait GenerationPhase
         $frameSize = $this->func->getFrameSize();
         if ($frameSize > 0) {
             // AArch64 requiere alineación a 16 bytes para sub
-            $this->emit("sub sp, sp, #{$frameSize}");
+            $this->emit("sub sp, sp, #{$frameSize}", "reservar {$frameSize} bytes para variables locales");
         }
 
         // Guardar parámetros (que llegan en x0, x1, ..., x7)
@@ -100,8 +97,11 @@ trait GenerationPhase
     }
 
     /**
-     * Genera instrucciones para guardar parámetros del registro al stack.
+     * ✅ CORRECCIÓN: Genera instrucciones para guardar SOLO parámetros del registro al stack.
      * Los parámetros enteros llegan en x0-x7.
+     * 
+     * Las variables locales NO son parámetros y no deben guardarse aquí.
+     * Se inicializan con sus valores por defecto al visitarlas.
      */
     protected function phaseGenerateSaveParameters(): void
     {
@@ -110,10 +110,13 @@ trait GenerationPhase
         $locals = $this->func->getLocals();
         $paramRegister = 0;  // x0 para primer parámetro, x1 para segundo, etc.
 
-        // Iterar sobre locales en orden de offset (primeros son parámetros)
+        // Iterar sobre locales en orden de offset, pero SOLO procesar parámetros (is_param = true)
         $sortedLocals = [];
         foreach ($locals as $name => $info) {
-            $sortedLocals[$info['offset']] = ['name' => $name, 'type' => $info['type']];
+            // ✅ Solo incluir parámetros reales
+            if (!empty($info['is_param'])) {
+                $sortedLocals[$info['offset']] = ['name' => $name, 'type' => $info['type']];
+            }
         }
         ksort($sortedLocals);
 
@@ -123,18 +126,36 @@ trait GenerationPhase
             $name = $varInfo['name'];
             $type = $varInfo['type'];
 
-            // Validar que el tipo es entero (int32, int8, int16, etc.)
-            if (in_array($type, ['int32', 'int8', 'int16', 'int64', 'rune'])) {
-                // Generar instrucción para guardar parámetro
+            // ✅ CORRECCIÓN: Usar registros adecuados según el tipo
+            if (in_array($type, ['int32', 'rune'])) {
+                // int32 y rune: parámetros llegan en xN pero almacenamos con wN (32-bit)
+                $reg = 'w' . $paramRegister;
+                $negOffset = -$offset;
+                $this->emit("str $reg, [x29, #$negOffset]", "param $name ($type, 32-bit)");
+                $paramRegister++;
+            } elseif ($type === 'bool') {
+                // bool llegaen xN pero almacenamos con wN (32-bit)
+                $reg = 'w' . $paramRegister;
+                $negOffset = -$offset;
+                $this->emit("str $reg, [x29, #$negOffset]", "param $name (bool, 32-bit)");
+                $paramRegister++;
+            } elseif (in_array($type, ['int8', 'int16', 'int64'])) {
+                // int8, int16, int64 → usar registros enteros
                 $reg = 'x' . $paramRegister;
                 $negOffset = -$offset;
-                $this->emit("str {$reg}, [x29, #{$negOffset}]", "param {$name}");
+                $this->emit("str $reg, [x29, #$negOffset]", "param $name ($type)");
                 $paramRegister++;
             } elseif (in_array($type, ['float32', 'float64'])) {
                 // Parámetros float llegan en s0-s7 (float32) o d0-d7 (float64)
                 $sreg = ($type === 'float32') ? 's' . $paramRegister : 'd' . $paramRegister;
                 $negOffset = -$offset;
-                $this->emit("str {$sreg}, [x29, #{$negOffset}]", "param float {$name}");
+                $this->emit("str $sreg, [x29, #$negOffset]", "param $name ($type)");
+                $paramRegister++;
+            } else {
+                // Puntero, string → x-register (64-bit)
+                $reg = 'x' . $paramRegister;
+                $negOffset = -$offset;
+                $this->emit("str $reg, [x29, #$negOffset]", "param $name ($type)");
                 $paramRegister++;
             }
         }
@@ -155,6 +176,14 @@ trait GenerationPhase
 
         // BARE-METAL: Si es _start, usar exit syscall
         if ($this->func->name === '_start') {
+            // ✅ EPÍLOGO COMPLETO: restaurar stack frame antes de exit (completitud académica)
+            $frameSize = $this->func->getFrameSize();
+            if ($frameSize > 0) {
+                $this->emit("add sp, sp, #{$frameSize}", 'restaurar stack pointer');
+            }
+            $this->emit('ldp x29, x30, [sp], #16', 'restaurar frame pointer y link register');
+            
+            // Syscalls de salida
             $this->emit('mov x0, #0',        'exit code = 0');
             $this->emit('mov x8, #93',       'syscall exit');
             $this->emit('svc #0',            'invoke');

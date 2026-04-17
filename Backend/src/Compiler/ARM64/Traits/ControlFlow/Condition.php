@@ -57,8 +57,17 @@ trait Condition
             $this->comment('if condición #' . ($i + 1));
             $this->visit($conditions[$i]);
 
-            // cbz: "compare and branch if zero" — salta si la condición es falsa
-            $this->emit("cbz x0, $nextLabel", 'falso → siguiente rama');
+            // ── OPTIMIZACIÓN: Branch directo si fue comparación simple ──────
+            // Si lastComparison indica una comparación INT simple, usar b.COND
+            if ($this->lastComparison['isSimple']) {
+                $condBranch = $this->resolveBranchCondition($this->lastComparison['op']);
+                $this->emit("b.$condBranch $nextLabel", "branch falso (comparación simple)");
+                // Limpiar el flag para la próxima condición
+                $this->lastComparison['isSimple'] = false;
+            } else {
+                // Fallback: cbz x0 para expresiones booleanas complejas
+                $this->emit("cbz w0, $nextLabel", 'falso → siguiente rama');
+            }
 
             // ── Bloque verdadero ──────────────────────────────────────────
             $this->generateBlock($blocks[$i]);
@@ -78,5 +87,22 @@ trait Condition
 
         $this->label($endLabel);
         return null;
+    }
+
+    /**
+     * Convierte operador de comparación a condición de branch AArch64.
+     * Ejemplo: '>' → 'gt' (branch if greater than)
+     */
+    private function resolveBranchCondition(string $op): string
+    {
+        return match ($op) {
+            '==' => 'eq',   // branch if equal
+            '!=' => 'ne',   // branch if not equal
+            '>'  => 'le',   // branch if NOT >  (invierte para el else)
+            '>=' => 'lt',   // branch if NOT >= (invierte para el else)
+            '<'  => 'ge',   // branch if NOT <  (invierte para el else)
+            '<=' => 'gt',   // branch if NOT <= (invierte para el else)
+            default => 'eq',
+        };
     }
 }

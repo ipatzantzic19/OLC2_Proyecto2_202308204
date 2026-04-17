@@ -26,25 +26,26 @@ trait IntLiteral
         $val = (int) $ctx->INT32()->getText();
 
         if ($val === 0) {
-            $this->emit('mov x0, xzr', 'int32 literal 0');
+            $this->emit('mov w0, wzr', 'int32 literal 0 (32-bit)');
 
         } elseif ($val > 0 && $val <= 65535) {
-            $this->emit("mov x0, #$val");
+            $this->emit("mov w0, #$val", 'int32 literal (32-bit)');
 
         } elseif ($val > 65535 && $val <= 0x7FFFFFFF) {
+            // Para valores > 16 bits, usar x0 (64-bit) ya que movk requiere x
             $lo = $val & 0xFFFF;
             $hi = ($val >> 16) & 0xFFFF;
-            $this->emit("mov x0, #$lo");
-            if ($hi) $this->emit("movk x0, #$hi, lsl #16");
+            $this->emit("mov x0, #$lo", 'int32 literal (lo bits)');
+            if ($hi) $this->emit("movk x0, #$hi, lsl #16", 'int32 literal (hi bits)');
 
         } else {
             // Negativo: cargar valor absoluto y negar
             $abs = abs($val);
             $lo  = $abs & 0xFFFF;
             $hi  = ($abs >> 16) & 0xFFFF;
-            $this->emit("mov x0, #$lo");
-            if ($hi) $this->emit("movk x0, #$hi, lsl #16");
-            if ($val < 0) $this->emit('neg x0, x0', "literal negativo $val");
+            $this->emit("mov x0, #$lo", 'int32 literal (negativo - lo)');
+            if ($hi) $this->emit("movk x0, #$hi, lsl #16", 'int32 literal (negativo - hi)');
+            if ($val < 0) $this->emit('neg w0, w0', "literal negativo $val (32-bit)");
         }
         return 'int32';
     }

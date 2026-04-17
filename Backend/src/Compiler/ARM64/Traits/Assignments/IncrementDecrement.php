@@ -15,9 +15,9 @@ namespace Golampi\Compiler\ARM64\Traits\Assignments;
  * Restricción de tipo (enunciado sección 3.3.10):
  *   Solo válidos para int32 y rune. No aplican a float32, bool ni string.
  *
- * Generación ARM64:
- *   x++:  ldr x0, [x29, #-offset]  → add x0, x0, #1 → str x0, [x29, #-offset]
- *   x--:  ldr x0, [x29, #-offset]  → sub x0, x0, #1 → str x0, [x29, #-offset]
+ * ✅ CORRECCIÓN FASE 3: Usar w-registers para int32/rune (32-bit)
+ *   x++:  ldr w0, [x29, #-offset]  → add w0, w0, #1 → str w0, [x29, #-offset]
+ *   x--:  ldr w0, [x29, #-offset]  → sub w0, w0, #1 → str w0, [x29, #-offset]
  *
  * ARM64 no tiene instrucciones inc/dec dedicadas (a diferencia de x86).
  * Se usan add/sub con inmediato #1, que el procesador maneja eficientemente.
@@ -30,10 +30,15 @@ trait IncrementDecrement
         if (!$this->func || !$this->func->hasLocal($name)) return null;
 
         $offset = $this->func->getOffset($name);
+        $type   = $this->func->getType($name);
+        
+        // ✅ Usar w0 para int32/rune (32-bit)
+        $reg = (in_array($type, ['int32', 'rune'])) ? 'w0' : 'x0';
+        
         $this->comment("$name++");
-        $this->emit("ldr x0, [x29, #-$offset]", "cargar $name");
-        $this->emit('add x0, x0, #1',            "$name + 1");
-        $this->emit("str x0, [x29, #-$offset]",  "guardar $name++");
+        $this->emit("ldr $reg, [x29, #-$offset]", "cargar $name ($type)");
+        $this->emit("add $reg, $reg, #1",         "$name + 1");
+        $this->emit("str $reg, [x29, #-$offset]", "guardar $name++");
         return null;
     }
 
@@ -43,10 +48,15 @@ trait IncrementDecrement
         if (!$this->func || !$this->func->hasLocal($name)) return null;
 
         $offset = $this->func->getOffset($name);
+        $type   = $this->func->getType($name);
+        
+        // ✅ Usar w0 para int32/rune (32-bit)
+        $reg = (in_array($type, ['int32', 'rune'])) ? 'w0' : 'x0';
+        
         $this->comment("$name--");
-        $this->emit("ldr x0, [x29, #-$offset]", "cargar $name");
-        $this->emit('sub x0, x0, #1',            "$name - 1");
-        $this->emit("str x0, [x29, #-$offset]",  "guardar $name--");
+        $this->emit("ldr $reg, [x29, #-$offset]", "cargar $name ($type)");
+        $this->emit("sub $reg, $reg, #1",         "$name - 1");
+        $this->emit("str $reg, [x29, #-$offset]", "guardar $name--");
         return null;
     }
 }

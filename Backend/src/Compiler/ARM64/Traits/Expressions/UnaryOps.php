@@ -52,8 +52,8 @@ trait UnaryOps
             // Negación de registro SIMD: fneg s0, s0
             $this->emit('fneg s0, s0', 'negación float32');
         } else {
-            // Negación entera: neg x0, x0  (equivale a rsb x0, x0, #0)
-            $this->emit('neg x0, x0', 'negación int32');
+            // Negación entera: neg w0, w0  (equivale a rsb w0, w0, #0)
+            $this->emit('neg w0, w0', 'negación int32');
         }
 
         return $type;
@@ -64,10 +64,10 @@ trait UnaryOps
     public function visitNotUnary($ctx)
     {
         $this->visit($ctx->unary());
-        // XOR del bit menos significativo: invierte true↔false
+        // XOR del bit menos significativo: invierte true↔false (bool es 32-bit)
         // 0 XOR 1 = 1  (false → true)
         // 1 XOR 1 = 0  (true  → false)
-        $this->emit('eor x0, x0, #1', 'NOT lógico');
+        $this->emit('eor w0, w0, #1', 'NOT lógico');
         return 'bool';
     }
 

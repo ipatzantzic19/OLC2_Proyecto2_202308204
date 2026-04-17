@@ -106,21 +106,37 @@ trait Comparisons
 
     /**
      * Comparación para tipos enteros (int32, bool, rune, string pointer).
-     * Usa cmp + cset.
+     * 
+     * Nota sobre optimización:
+     *   - El movimiento "mov w1, w0" es NECESARIO por la arquitectura del compilador
+     *   - El RHS se evalúa siempre a w0 (por el sistema de visitantes)
+     *   - Para comparar necesitamos ambos operandos: uno en w0 y otro en w1
+     *   - Una optimización futura sería permitir evaluación a registros específicos
+     *
+     * Precondición: w0 contiene lhs (evaluado ya en visitEquality/visitRelational)
      */
     private function generateIntComparison(string $op, callable $evalRhs): void
     {
-        // Guardar lhs en stack
-        $this->pushStack();
-        // Evaluar rhs → x0
+        // ✅ w0 ya contiene lhs (evaluado en visitEquality/visitRelational)
+        // Preservar lhs en w1 para la comparación
+        $this->emit('mov w1, w0');
+        
+        // Evaluar rhs → w0 (mediante closure)
         $evalRhs();
-        // Recuperar lhs en x1
-        $this->emit('ldr x1, [sp]', 'lhs ← stack');
-        $this->emit('add sp, sp, #16');
 
-        $this->emit('cmp x1, x0', 'comparar lhs vs rhs');
-        $cond = $this->resolveIntCondition($op);
-        $this->emit("cset x0, $cond", "bool resultado ($op)");
+        // ✅ cmp setup los flags sin generar cset
+        $this->emit('cmp w1, w0', 'comparar w1(lhs) vs w0(rhs) - flags setup');
+        
+        // ✅ Marcar comparación simple para que IF/ControlFlow use branch directo
+        $this->lastComparison = [
+            'isSimple' => true,
+            'op' => $op,
+            'lhsReg' => 'w1',
+            'rhsReg' => 'w0'
+        ];
+        
+        // ✅ NO generar cset - ControlFlow usará branch directo para IF
+        // Si se usa como valor booleano en expresión, se maneja en otro contexto
     }
 
     /**

@@ -215,6 +215,11 @@ class ARM64Generator extends \GolampiBaseVisitor
     // Cada entrada: ['break' => label, 'continue' => label]
     protected array $loopStack = [];
 
+    // ── Rastreo de comparaciones simples (para branch directo en IF) ───────
+    // Estructura: ['isSimple' => bool, 'op' => string, 'lhsReg' => string, 'rhsReg' => string]
+    // Permite IF/ControlFlow usar b.EQ, b.LT, etc en lugar de cbz
+    protected array $lastComparison = ['isSimple' => false, 'op' => '', 'lhsReg' => '', 'rhsReg' => ''];
+
     // ── Funciones de usuario registradas (hoisting) ───────────────────────
     protected array $userFunctions = [];
 
@@ -337,6 +342,7 @@ class ARM64Generator extends \GolampiBaseVisitor
 
         // ── Copiar parámetros de registros al stack frame ─────────────────
         // Convención AArch64: int/bool/string/pointer en x0–x7, float32 en s0–s7
+        // IMPORTANTE: int32 se almacena con registros de 32-bit (w0-w7)
         $intReg   = 0;
         $floatReg = 0;
         foreach ($params as $p) {
@@ -345,8 +351,16 @@ class ARM64Generator extends \GolampiBaseVisitor
                 $reg = 's' . $floatReg++;
                 $this->emit("str $reg, [x29, #-$offset]", "param {$p['name']} ($reg) → frame");
             } else {
-                $reg = 'x' . $intReg++;
-                $this->emit("str $reg, [x29, #-$offset]", "param {$p['name']} ($reg) → frame");
+                // int32/bool/rune/string/puntero → use 32-bit register w for int32 types
+                if ($p['type'] === 'int32' || $p['type'] === 'bool' || $p['type'] === 'rune') {
+                    $reg = 'w' . $intReg;
+                    $this->emit("str $reg, [x29, #-$offset]", "param {$p['name']} ($reg int32) → frame");
+                } else {
+                    // puntero, string → 64-bit
+                    $reg = 'x' . $intReg;
+                    $this->emit("str $reg, [x29, #-$offset]", "param {$p['name']} ($reg ptr) → frame");
+                }
+                $intReg++;
             }
         }
 

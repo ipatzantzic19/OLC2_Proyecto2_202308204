@@ -85,23 +85,39 @@ trait SimpleAssignment
 
     // ── Helpers internos ──────────────────────────────────────────────────
 
-    /** Guarda x0 o s0 en el slot de la variable según su tipo. */
+    /** ✅ CORRECCIÓN: Guarda x0 o s0 en el slot de la variable según su tipo.
+     *  - float32 → str s0
+     *  - int32/bool/rune → str w0 (32-bit) 
+     *  - puntero/dirección → str x0 (64-bit)
+     */
     protected function storeToFrame(string $type, int $offset): void
     {
         if ($type === 'float32') {
             $this->emit("str s0, [x29, #-$offset]", 'guardar float32');
+        } elseif (in_array($type, ['int32', 'bool', 'rune'])) {
+            // ✅ Usar w0 (32-bit) para tipos enteros
+            $this->emit("str w0, [x29, #-$offset]", "guardar $type (32-bit)");
         } else {
-            $this->emit("str x0, [x29, #-$offset]", "guardar $type");
+            // Puntero, string, array → x0 (64-bit)
+            $this->emit("str x0, [x29, #-$offset]", "guardar $type (64-bit)");
         }
     }
 
-    /** Carga desde el slot de la variable al registro correcto. */
+    /** ✅ CORRECCIÓN: Carga desde el slot de la variable al registro correcto.
+     *  - float32 → ldr s0
+     *  - int32/bool/rune → ldr w0 (32-bit)
+     *  - puntero/dirección → ldr x0 (64-bit)
+     */
     protected function loadFromFrame(string $type, int $offset): void
     {
         if ($type === 'float32') {
             $this->emit("ldr s0, [x29, #-$offset]", 'cargar float32');
+        } elseif (in_array($type, ['int32', 'bool', 'rune'])) {
+            // ✅ Usar w0 (32-bit) para tipos enteros
+            $this->emit("ldr w0, [x29, #-$offset]", "cargar $type (32-bit)");
         } else {
-            $this->emit("ldr x0, [x29, #-$offset]", "cargar $type");
+            // Puntero, string, array → x0 (64-bit)
+            $this->emit("ldr x0, [x29, #-$offset]", "cargar $type (64-bit)");
         }
     }
 

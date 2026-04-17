@@ -81,6 +81,8 @@ trait PrescanPhase
                             $this->prescanVarDecl($declChild);
                         }
                     }
+                    // ✅ CORRECCIÓN: También recurse en Declaration para encontrar ShortVarDecl/Statement anidados
+                    $this->phasePrescanBlock($child);
                     break;
                     
                 case 'ShortVarDeclContext':
@@ -307,25 +309,25 @@ trait PrescanPhase
     {
         if (!isset($this->func)) return;
 
-        // Patrón: x := expr
+        // Patrón: x := expr  o  x, y := expr1, expr2
         // Tipo se infiere desde la expresión
 
-        $identList = $shortVarDeclCtx->identifierList();
+        $idList = $shortVarDeclCtx->idList();  // ✅ Método correcto es idList(), no identifierList()
         $exprList  = $shortVarDeclCtx->expressionList();
 
-        if (!$identList || !$exprList) {
+        if (!$idList || !$exprList) {
             return;
         }
 
-        // Registrar cada identificador con tipo 'unknown' (será inferido después)
-        $count = $identList->getChildCount();
-        for ($i = 0; $i < $count; $i++) {
-            $child = $identList->getChild($i);
-            if ($child instanceof \TerminalNode) {
-                continue;
-            }
+        // ✅ CORRECCIÓN: Usar i += 2 para saltear los separadores ',' (TerminalNodes)
+        // idList: ID ',' ID ',' ID → hijos en índices 0, 1, 2, 3, 4
+        // Queremos los IDs en índices pares: 0, 2, 4
+        $count = $idList->getChildCount();
+        for ($i = 0; $i < $count; $i += 2) {
+            $child = $idList->getChild($i);
             if (method_exists($child, 'getText')) {
                 $name = $child->getText();
+                // Registrar con tipo 'unknown' (será inferido en visitShortVarDecl)
                 $this->func->allocLocal($name, 'unknown');
             }
         }

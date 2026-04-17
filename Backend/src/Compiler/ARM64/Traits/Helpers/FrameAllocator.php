@@ -16,12 +16,13 @@ namespace Golampi\Compiler\ARM64\Traits\Helpers;
  * También provee storeDefault: genera el código ARM64 que almacena
  * el valor por defecto del tipo cuando se declara una variable sin init.
  *
+ * ✅ CORRECCIÓN FASE 3: Usar w-registers para int32/bool/rune
  * Valores por defecto (enunciado sección 3.2.3):
- *   int32   → 0       : mov x0, xzr + str x0
+ *   int32   → 0       : mov w0, wzr + str w0  (32-bit)
  *   float32 → 0.0     : movi d0, #0 + str s0
- *   bool    → false   : mov x0, xzr + str x0
- *   string  → ""      : adrp + add + str x0
- *   rune    → '\0'    : mov x0, xzr + str x0
+ *   bool    → false   : mov w0, wzr + str w0  (32-bit)
+ *   string  → ""      : adrp + add + str x0   (64-bit)
+ *   rune    → '\0'    : mov w0, wzr + str w0  (32-bit)
  */
 trait FrameAllocator
 {
@@ -49,6 +50,8 @@ trait FrameAllocator
     /**
      * Genera el código que almacena el valor por defecto del tipo
      * en el slot [x29 - offset] del frame.
+     * 
+     * ✅ CORRECCIÓN: Usar w-registers para int32/bool/rune (32-bit)
      */
     protected function storeDefault(string $type, int $offset): void
     {
@@ -60,11 +63,13 @@ trait FrameAllocator
                 break;
 
             case 'bool':
-                $this->emit('mov x0, xzr',               'bool default = false');
-                $this->emit("str x0, [x29, #-$offset]");
+                // ✅ Usar w0 (32-bit) para bool
+                $this->emit('mov w0, wzr',               'bool default = false (32-bit)');
+                $this->emit("str w0, [x29, #-$offset]");
                 break;
 
             case 'string':
+                // String es puntero → x0 (64-bit)
                 $empty = $this->internString('');
                 $this->emit("adrp x0, $empty",           'string default = ""');
                 $this->emit("add x0, x0, :lo12:$empty");
@@ -72,13 +77,21 @@ trait FrameAllocator
                 break;
 
             case 'rune':
-                $this->emit('mov x0, xzr',               "rune default = '\\0'");
-                $this->emit("str x0, [x29, #-$offset]");
+                // ✅ Usar w0 (32-bit) para rune
+                $this->emit('mov w0, wzr',               "rune default = '\\0' (32-bit)");
+                $this->emit("str w0, [x29, #-$offset]");
                 break;
 
             default: // int32, nil, pointer
-                $this->emit('mov x0, xzr',               "$type default = 0");
-                $this->emit("str x0, [x29, #-$offset]");
+                // ✅ Usar w0 (32-bit) para int32
+                if (in_array($type, ['int32', 'nil'])) {
+                    $this->emit('mov w0, wzr',               "$type default = 0 (32-bit)");
+                    $this->emit("str w0, [x29, #-$offset]");
+                } else {
+                    // Puntero → x0 (64-bit)
+                    $this->emit('mov x0, xzr',               "$type default = null (64-bit)");
+                    $this->emit("str x0, [x29, #-$offset]");
+                }
                 break;
         }
     }

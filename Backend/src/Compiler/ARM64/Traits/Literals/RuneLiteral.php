@@ -43,7 +43,7 @@ trait RuneLiteral
                         : ord($inner[0]),
         };
 
-        $this->emit("mov x0, #$val", "rune '$inner' = U+$val");
+        $this->emit("mov w0, #$val", "rune '$inner' = U+$val (32-bit)");
         return 'rune';
     }
 }
