@@ -70,10 +70,13 @@ trait FloatComparison
      * Convierte float32 (s0) → float64 (d0).
      * Necesario para llamadas a printf que es variadic: AArch64 ABI
      * requiere que los argumentos float variadic se pasen como double (d0).
+     * 
+     * Para ARM64 AAPCS variadic: floats deben estar TANTO en d0 como en x1
      */
     protected function emitFloat32ToDouble(): void
     {
         $this->emit('fcvt d0, s0', 'float32 a float64 para printf variadic');
+        $this->emit('fmov x1, d0', 'copiar float64 a x1 para variadic ABI');
     }
 
     /** Guarda s0 en el slot float del frame. */
