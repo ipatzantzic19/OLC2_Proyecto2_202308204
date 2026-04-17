@@ -53,8 +53,17 @@ trait AssemblyBuilder
         $lines = [];
 
         // ── Sección .data ─────────────────────────────────────────────────
+        $lines[] = '.section .data';
+        
+        // Agregar buffers estáticos para bare-metal
+        $lines[] = 'msg:';
+        $lines[] = '    .ascii "\n"';
+        $lines[] = 'buffer:';
+        $lines[] = '    .ascii "0\n"';
+        $lines[] = 'len = . - buffer';
+        $lines[] = '';
+        
         if (!empty($this->dataLines)) {
-            $lines[] = '.section .data';
             foreach ($this->dataLines as $l) {
                 $lines[] = $l;
             }
@@ -63,6 +72,7 @@ trait AssemblyBuilder
 
         // ── Sección .text ─────────────────────────────────────────────────
         $lines[] = '.section .text';
+        $lines[] = '.align 2';
         $lines[] = '.global _start';
         $lines[] = '';
         foreach ($this->textLines as $l) {

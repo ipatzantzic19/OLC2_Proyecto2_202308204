@@ -69,6 +69,11 @@ trait GenerationPhase
         // Etiqueta de función
         $this->label($label);
 
+        // BARE-METAL: Si es _start, omitir prologue
+        if ($label === '_start') {
+            return;
+        }
+
         // Guardar x29 (FP) y x30 (LR) con decremento automático de stack
         $this->emit('stp x29, x30, [sp, #-16]!');
 
@@ -97,16 +102,10 @@ trait GenerationPhase
     /**
      * Genera instrucciones para guardar parámetros del registro al stack.
      * Los parámetros enteros llegan en x0-x7.
-     * 
-     * OPTIMIZACIÓN: NO guarda parámetros con offset=0 (que viven en registros).
-     * Tampoco guarda nada para main() (que no recibe parámetros reales).
      */
     protected function phaseGenerateSaveParameters(): void
     {
         if (!isset($this->func)) return;
-
-        // para _start: puede haber parámetros (aunque normalmente no)
-        // procesamos igual que otras funciones
 
         $locals = $this->func->getLocals();
         $paramRegister = 0;  // x0 para primer parámetro, x1 para segundo, etc.
@@ -153,6 +152,14 @@ trait GenerationPhase
     protected function phaseGenerateEpilogue(): void
     {
         if (!isset($this->func)) return;
+
+        // BARE-METAL: Si es _start, usar exit syscall
+        if ($this->func->name === '_start') {
+            $this->emit('mov x0, #0',        'exit code = 0');
+            $this->emit('mov x8, #93',       'syscall exit');
+            $this->emit('svc #0',            'invoke');
+            return;
+        }
 
         // Restaurar callee-saved si fue guardado
         $epilogue = $this->func->generateCalleeSavedEpilog();

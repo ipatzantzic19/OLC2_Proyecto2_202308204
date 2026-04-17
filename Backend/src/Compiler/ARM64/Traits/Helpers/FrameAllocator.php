@@ -49,8 +49,6 @@ trait FrameAllocator
     /**
      * Genera el código que almacena el valor por defecto del tipo
      * en el slot [x29 - offset] del frame.
-     * 
-     * OPTIMIZACIÓN: Si offset=0, no guardar (variable vive en registros).
      */
     protected function storeDefault(string $type, int $offset): void
     {

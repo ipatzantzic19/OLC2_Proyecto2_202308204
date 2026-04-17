@@ -106,11 +106,7 @@ trait Comparisons
 
     /**
      * Comparación para tipos enteros (int32, bool, rune, string pointer).
-     * 
-     * OPTIMIZACIÓN: Si estamos en contexto de salto condicional dentro de if,
-     * emitir un salto directo (b.gt, b.le, etc.) en lugar de cset + cbz.
-     * 
-     * Usa cmp + cset (normal) o cmp + b.cond (optimizado en contexto if).
+     * Usa cmp + cset.
      */
     private function generateIntComparison(string $op, callable $evalRhs): void
     {
@@ -123,45 +119,13 @@ trait Comparisons
         $this->emit('add sp, sp, #16');
 
         $this->emit('cmp x1, x0', 'comparar lhs vs rhs');
-
-        // OPTIMIZACIÓN: Si estamos en contexto de salto if, emitir salto directo
-        $jumpCtx = $this->getConditionalJumpContext();
-        if ($jumpCtx !== null) {
-            // Estamos dentro de if: generar salto directo
-            $cond = $this->resolveIntCondition($op);
-            if ($jumpCtx['inverted']) {
-                // Saltar si FALSO (invertir la condición)
-                $cond = $this->invertCondition($cond);
-            }
-            $this->emit("b.$cond " . $jumpCtx['label'], "saltar si $op");
-        } else {
-            // Contexto normal: generar bool
-            $cond = $this->resolveIntCondition($op);
-            $this->emit("cset x0, $cond", "bool resultado ($op)");
-        }
-    }
-
-    /**
-     * Invierte una condición ARM64 para el salto opuesto.
-     * eq ↔ ne, lt ↔ ge, le ↔ gt, etc.
-     */
-    private function invertCondition(string $cond): string
-    {
-        return match ($cond) {
-            'eq' => 'ne',
-            'ne' => 'eq',
-            'lt' => 'ge',
-            'le' => 'gt',
-            'gt' => 'le',
-            'ge' => 'lt',
-            default => $cond,
-        };
+        $cond = $this->resolveIntCondition($op);
+        $this->emit("cset x0, $cond", "bool resultado ($op)");
     }
 
     /**
      * Comparación para float32.
-     * OPTIMIZACIÓN: También soporta saltos directos en contexto if.
-     * Usa pushFloatStack + fcmp + cset o fcmp + b.cond.
+     * Usa pushFloatStack + fcmp + cset con condiciones especiales.
      */
     private function generateFloatComparison(string $op, callable $evalRhs): void
     {
@@ -172,62 +136,10 @@ trait Comparisons
         // Recuperar lhs en s1
         $this->popFloatStack();  // s1 = lhs, s0 = rhs
 
-        // OPTIMIZACIÓN: Si estamos en contexto de salto, emitir salto float
-        $jumpCtx = $this->getConditionalJumpContext();
-        if ($jumpCtx !== null) {
-            $this->emitFloatComparisonWithJump($op, $jumpCtx);
-        } else {
-            $this->emitFloatComparison($op);
-        }
+        $this->emitFloatComparison($op);
     }
 
     // ── Resolución de condiciones ─────────────────────────────────────────
-
-    /**
-     * Emite comparación float con salto directo en contexto de if.
-     * Precondición: s1 = lhs, s0 = rhs (ya cargados).
-     */
-    private function emitFloatComparisonWithJump(string $op, array $jumpCtx): void
-    {
-        $this->emit('fcmp s1, s0', 'comparar floats (lhs s1 vs rhs s0)');
-        
-        $cond = match ($op) {
-            '=='  => 'eq',
-            '!='  => 'ne',
-            '>'   => 'gt',
-            '>='  => 'ge',
-            '<'   => 'mi',  // ARM: minus = lhs < rhs en resultado de fcmp
-            '<='  => 'ls',  // ARM: lower or same
-            default => 'eq',
-        };
-        
-        if ($jumpCtx['inverted']) {
-            $cond = $this->invertFloatCondition($cond);
-        }
-        
-        $this->emit("b.$cond " . $jumpCtx['label'], "saltar si $op (float)");
-    }
-
-    /**
-     * Invierte una condición float ARM64.
-     * Nota: float usa 'mi'/'ls' en lugar de 'lt'/'le'.
-     */
-    private function invertFloatCondition(string $cond): string
-    {
-        return match ($cond) {
-            'eq' => 'ne',
-            'ne' => 'eq',
-            'lt' => 'ge',
-            'le' => 'gt',
-            'gt' => 'le',
-            'ge' => 'lt',
-            'mi' => 'pl',  // mi (minus) ↔ pl (plus/greater) para <
-            'ls' => 'hi',  // ls (lower/same) ↔ hi (higher) para <=
-            'hi' => 'ls',  // Inverso de hi
-            'pl' => 'mi',  // Inverso de pl
-            default => $cond,
-        };
-    }
 
     /**
      * Mapea operador de comparación → condición AArch64 para enteros.

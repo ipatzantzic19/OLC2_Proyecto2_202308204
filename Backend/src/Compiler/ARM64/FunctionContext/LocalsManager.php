@@ -38,11 +38,8 @@ trait LocalsManager
      * Registra una variable escalar en el stack frame.
      * Devuelve el offset desde fp donde se almacena.
      *
-     * Todas las variables se almacenan en stack: [fp-8], [fp-16], etc.
-     * Esto evita que se sobrescriban entre sí cuando se usan en expresiones complejas.
-     *
      * Precondición: $name debe ser un identificador válido.
-     * Postcondición: la variable está en $locals.
+     * Postcondición: la variable está en $locals y ubicada en stack.
      *
      * @param string $name    nombre de la variable
      * @param string $type    tipo: 'int32', 'float32', 'bool', 'string', 'rune', 'nil'
@@ -59,16 +56,13 @@ trait LocalsManager
             return $this->locals[$name]['offset'];
         }
 
-        // Todas las variables reciben un offset en stack real
         $offset = $this->nextOffset;
-        $this->nextOffset += 8;  // Siguiente slot
-
         $this->locals[$name] = [
             'offset'   => $offset,
             'type'     => $type,
             'is_param' => $isParam,
         ];
-
+        $this->nextOffset += 8;  // Siguiente slot
         return $offset;
     }
 

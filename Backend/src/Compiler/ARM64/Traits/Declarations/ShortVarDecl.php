@@ -209,8 +209,6 @@ trait ShortVarDecl
     /**
      * Almacena x0 o s0 en el frame slot correspondiente según el tipo inferido.
      * Se reutiliza también en los casos normales A y B.
-     * 
-     * OPTIMIZACIÓN: Si offset=0, la variable vive en registros (no guardar al stack).
      */
     private function storeInferredResult(string $type, int $offset): void
     {

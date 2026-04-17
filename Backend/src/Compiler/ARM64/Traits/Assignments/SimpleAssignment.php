@@ -85,9 +85,7 @@ trait SimpleAssignment
 
     // ── Helpers internos ──────────────────────────────────────────────────
 
-    /** Guarda x0 o s0 en el slot de la variable según su tipo.
-     *  OPTIMIZACIÓN: Si offset=0, no guardar (variable vive en registros).
-     */
+    /** Guarda x0 o s0 en el slot de la variable según su tipo. */
     protected function storeToFrame(string $type, int $offset): void
     {
         if ($type === 'float32') {
@@ -97,9 +95,7 @@ trait SimpleAssignment
         }
     }
 
-    /** Carga desde el slot de la variable al registro correcto.
-     *  OPTIMIZACIÓN: Si offset=0, no cargar (variable ya está en registros).
-     */
+    /** Carga desde el slot de la variable al registro correcto. */
     protected function loadFromFrame(string $type, int $offset): void
     {
         if ($type === 'float32') {
