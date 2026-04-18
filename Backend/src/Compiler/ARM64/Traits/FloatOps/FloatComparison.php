@@ -52,7 +52,7 @@ trait FloatComparison
      */
     protected function emitIntToFloat(): void
     {
-        $this->emit('scvtf s0, w0', 'int32 → float32');
+        $this->emit('scvtf s0, x0', 'int32 → float32');
     }
 
     /**
@@ -62,8 +62,8 @@ trait FloatComparison
      */
     protected function emitFloatToInt(): void
     {
-        $this->emit('fcvtzs w0, s0', 'float32 → int32 (truncar hacia cero)');
-        $this->emit('sxtw x0, w0',   'sign-extend 32→64 bits');
+        $this->emit('fcvtzs x0, s0', 'float32 → int32 (truncar hacia cero)');
+        $this->emit('sxtw x0, x0',   'sign-extend 32→64 bits (already x0, for consistency)');
     }
 
     /**

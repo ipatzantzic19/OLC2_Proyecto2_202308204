@@ -26,10 +26,10 @@ trait IntLiteral
         $val = (int) $ctx->INT32()->getText();
 
         if ($val === 0) {
-            $this->emit('mov w0, wzr', 'int32 literal 0 (32-bit)');
+            $this->emit('mov x0, xzr', 'int32 literal 0 (64-bit per AArch64)');
 
         } elseif ($val > 0 && $val <= 65535) {
-            $this->emit("mov w0, #$val", 'int32 literal (32-bit)');
+            $this->emit("mov x0, #$val", 'int32 literal (64-bit per AArch64)');
 
         } elseif ($val > 65535 && $val <= 0x7FFFFFFF) {
             // Para valores > 16 bits, usar x0 (64-bit) ya que movk requiere x
@@ -45,7 +45,7 @@ trait IntLiteral
             $hi  = ($abs >> 16) & 0xFFFF;
             $this->emit("mov x0, #$lo", 'int32 literal (negativo - lo)');
             if ($hi) $this->emit("movk x0, #$hi, lsl #16", 'int32 literal (negativo - hi)');
-            if ($val < 0) $this->emit('neg w0, w0', "literal negativo $val (32-bit)");
+            if ($val < 0) $this->emit('neg x0, x0', "literal negativo $val (64-bit per AArch64)");
         }
         return 'int32';
     }

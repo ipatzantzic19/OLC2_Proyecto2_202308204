@@ -97,7 +97,7 @@ trait PrintlnCall
     {
         // ✅ CORRECCIÓN: Usar w-registers para int32 (32-bit)
         // Bare-metal: convertir int a ASCII (valor en w0 tras fmt.Println)
-        $this->emit('add w3, w0, #48',              'convertir int a ASCII (w0 + 48 → w3)');
+        $this->emit('add x3, x0, #48',              'convertir int a ASCII (x0 + 48 → x3)');
         $this->emit('adrp x4, buffer');
         $this->emit('add x4, x4, :lo12:buffer');
         $this->emit('strb w3, [x4]',                'guardar ASCII en buffer[0]');

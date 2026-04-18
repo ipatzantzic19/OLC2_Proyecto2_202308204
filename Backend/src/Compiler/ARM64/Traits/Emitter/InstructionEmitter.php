@@ -69,22 +69,22 @@ trait InstructionEmitter
     protected function pushStack(): void
     {
         $this->emit('sub sp, sp, #16', 'reservar slot temporal');
-        $this->emit('str w0, [sp]',    'w0 → stack temporal (int32)');
+        $this->emit('str x0, [sp]',    'x0 → stack temporal (int32)');
         if ($this->func) $this->func->pushTemp();
     }
 
     /**
-     * Emite la instrucción binaria correcta para (w1 OP w0 → w0).
-     * Precondición: w1 = lhs (recuperado del stack), w0 = rhs.
-     * Note: int32 usa registros de 32-bit (w), no 64-bit (x).
+     * Emite la instrucción binaria correcta para (x1 OP x0 → x0).
+     * Precondición: x1 = lhs (recuperado del stack), x0 = rhs.
+     * Note: int32 usa registros de 64-bit (x) per AArch64 standard.
      */
     protected function emitBinaryOp(string $op): void
     {
         match ($op) {
-            '+'  => $this->emit('add w0, w1, w0',  'int32 suma'),
-            '-'  => $this->emit('sub w0, w1, w0',  'int32 resta'),
-            '*'  => $this->emit('mul w0, w1, w0',  'int32 mul'),
-            '/'  => $this->emit('sdiv w0, w1, w0', 'int32 div (con signo)'),
+            '+'  => $this->emit('add x0, x1, x0',  'int32 suma'),
+            '-'  => $this->emit('sub x0, x1, x0',  'int32 resta'),
+            '*'  => $this->emit('mul x0,x1, x0',  'int32 mul'),
+            '/'  => $this->emit('sdiv x0, x1, x0', 'int32 div (con signo)'),
             default => null,
         };
     }

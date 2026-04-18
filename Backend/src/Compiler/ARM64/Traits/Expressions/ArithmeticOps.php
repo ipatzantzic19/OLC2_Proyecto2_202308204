@@ -96,17 +96,17 @@ trait ArithmeticOps
 
         if ($rhsType === 'float32') {
             // lhs está en stack como bits enteros, recuperar y convertir
-            $this->emit('ldr w1, [sp]', 'lhs ← stack (int32)');
+            $this->emit('ldr x1, [sp]', 'lhs ← stack (int32)');
             $this->emit('add sp, sp, #16');
-            $this->emit('scvtf s1, w1', 'lhs int32 → float32 (promotion)');
+            $this->emit('scvtf s1, x1', 'lhs int32 → float32 (promotion)');
             // s0 ya tiene rhs float
             $this->emitFloatBinaryOp($op);
             return 'float32';
         }
 
-        $this->emit('ldr w1, [sp]', 'lhs ← stack (int32)');
+        $this->emit('ldr x1, [sp]', 'lhs ← stack (int32)');
         $this->emit('add sp, sp, #16');
-        $intOp = ($op === '+') ? 'add w0, w1, w0' : 'sub w0, w1, w0';
+        $intOp = ($op === '+') ? 'add x0, x1, x0' : 'sub x0, x1, x0';
         $this->emit($intOp);
         return 'int32';
     }
@@ -127,19 +127,19 @@ trait ArithmeticOps
 
         if ($rhsType === 'float32' && ($op === '*' || $op === '/')) {
             // Promover lhs → float
-            $this->emit('ldr w1, [sp]', 'lhs ← stack (int32)');
+            $this->emit('ldr x1, [sp]', 'lhs ← stack (int32)');
             $this->emit('add sp, sp, #16');
-            $this->emit('scvtf s1, w1', 'lhs int32 → float32 (promotion)');
+            $this->emit('scvtf s1, x1', 'lhs int32 → float32 (promotion)');
             $this->emitFloatBinaryOp($op);
             return 'float32';
         }
 
-        $this->emit('ldr w1, [sp]', 'lhs ← stack (int32)');
+        $this->emit('ldr x1, [sp]', 'lhs ← stack (int32)');
         $this->emit('add sp, sp, #16');
 
         match ($op) {
-            '*' => $this->emit('mul w0, w1, w0', 'int32 mul'),
-            '/' => $this->emit('sdiv w0, w1, w0', 'int32 div (signed)'),
+            '*' => $this->emit('mul x0, x1, x0', 'int32 mul'),
+            '/' => $this->emit('sdiv x0, x1, x0', 'int32 div (signed)'),
             '%' => $this->emitModulo(),
             default => null,
         };
@@ -148,13 +148,13 @@ trait ArithmeticOps
 
     /**
      * Módulo: a % b = a - (a / b) * b
-     * Precondición: w1 = lhs, w0 = rhs
-     * ARM64 no tiene instrucción mod directa; se calcula via sdiv + msub (32-bit).
+     * Precondición: x1 = lhs, x0 = rhs
+     * ARM64 no tiene instrucción mod directa; se calcula via sdiv + msub (64-bit).
      */
     private function emitModulo(): void
     {
-        $this->emit('sdiv w2, w1, w0',     'w2 = lhs / rhs (cociente int32)');
-        $this->emit('msub w0, w2, w0, w1', 'w0 = lhs - cociente * rhs (resto int32)');
+        $this->emit('sdiv x2, x1, x0',     'x2 = lhs / rhs (cociente int32)');
+        $this->emit('msub x0, x2, x0, x1', 'x0 = lhs - cociente * rhs (resto int32)');
     }
 
     /**
@@ -181,7 +181,7 @@ trait ArithmeticOps
         // Si rhs necesita conversión int32 → float32
         if ($rhsType === 'int32' || $rhsType === 'rune') {
             // s0 contiene int en x0; hay que convertir el valor entero a float
-            $this->emit('scvtf s0, w0', 'rhs int32 → float32');
+            $this->emit('scvtf s0, x0', 'rhs int32 → float32');
         }
 
         // Recuperar lhs del stack en s1

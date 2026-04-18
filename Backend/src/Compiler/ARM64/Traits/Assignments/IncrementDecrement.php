@@ -16,8 +16,8 @@ namespace Golampi\Compiler\ARM64\Traits\Assignments;
  *   Solo válidos para int32 y rune. No aplican a float32, bool ni string.
  *
  * ✅ CORRECCIÓN FASE 3: Usar w-registers para int32/rune (32-bit)
- *   x++:  ldr w0, [x29, #-offset]  → add w0, w0, #1 → str w0, [x29, #-offset]
- *   x--:  ldr w0, [x29, #-offset]  → sub w0, w0, #1 → str w0, [x29, #-offset]
+ *   x++:  ldr x0, [x29, #-offset]  → add x0, x0, #1 → str x0, [x29, #-offset]
+ *   x--:  ldr x0, [x29, #-offset]  → sub x0, x0, #1 → str x0, [x29, #-offset]
  *
  * ARM64 no tiene instrucciones inc/dec dedicadas (a diferencia de x86).
  * Se usan add/sub con inmediato #1, que el procesador maneja eficientemente.
@@ -32,8 +32,8 @@ trait IncrementDecrement
         $offset = $this->func->getOffset($name);
         $type   = $this->func->getType($name);
         
-        // ✅ Usar w0 para int32/rune (32-bit)
-        $reg = (in_array($type, ['int32', 'rune'])) ? 'w0' : 'x0';
+        // ✅ Usar x0 para int32/rune (64-bit per AArch64 standard)
+        $reg = (in_array($type, ['int32', 'rune'])) ? 'x0' : 'x0';
         
         $this->comment("$name++");
         $this->emit("ldr $reg, [x29, #-$offset]", "cargar $name ($type)");
@@ -50,8 +50,8 @@ trait IncrementDecrement
         $offset = $this->func->getOffset($name);
         $type   = $this->func->getType($name);
         
-        // ✅ Usar w0 para int32/rune (32-bit)
-        $reg = (in_array($type, ['int32', 'rune'])) ? 'w0' : 'x0';
+        // ✅ Usar x0 para int32/rune (64-bit per AArch64 standard)
+        $reg = (in_array($type, ['int32', 'rune'])) ? 'x0' : 'x0';
         
         $this->comment("$name--");
         $this->emit("ldr $reg, [x29, #-$offset]", "cargar $name ($type)");

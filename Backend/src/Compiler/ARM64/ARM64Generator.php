@@ -342,7 +342,7 @@ class ARM64Generator extends \GolampiBaseVisitor
 
         // ── Copiar parámetros de registros al stack frame ─────────────────
         // Convención AArch64: int/bool/string/pointer en x0–x7, float32 en s0–s7
-        // IMPORTANTE: int32 se almacena con registros de 32-bit (w0-w7)
+        // IMPORTANTE: int32 usa registros de 64-bit (x0-x7) per AArch64 standard
         $intReg   = 0;
         $floatReg = 0;
         foreach ($params as $p) {
@@ -351,9 +351,9 @@ class ARM64Generator extends \GolampiBaseVisitor
                 $reg = 's' . $floatReg++;
                 $this->emit("str $reg, [x29, #-$offset]", "param {$p['name']} ($reg) → frame");
             } else {
-                // int32/bool/rune/string/puntero → use 32-bit register w for int32 types
+                // int32/bool/rune/string/puntero → use 64-bit register x for all types
                 if ($p['type'] === 'int32' || $p['type'] === 'bool' || $p['type'] === 'rune') {
-                    $reg = 'w' . $intReg;
+                    $reg = 'x' . $intReg;
                     $this->emit("str $reg, [x29, #-$offset]", "param {$p['name']} ($reg int32) → frame");
                 } else {
                     // puntero, string → 64-bit

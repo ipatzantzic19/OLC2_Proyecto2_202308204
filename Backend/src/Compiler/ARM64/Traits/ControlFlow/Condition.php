@@ -66,7 +66,7 @@ trait Condition
                 $this->lastComparison['isSimple'] = false;
             } else {
                 // Fallback: cbz x0 para expresiones booleanas complejas
-                $this->emit("cbz w0, $nextLabel", 'falso → siguiente rama');
+                $this->emit("cbz x0, $nextLabel", 'falso → siguiente rama');
             }
 
             // ── Bloque verdadero ──────────────────────────────────────────

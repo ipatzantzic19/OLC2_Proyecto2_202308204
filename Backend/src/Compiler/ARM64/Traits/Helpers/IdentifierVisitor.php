@@ -13,7 +13,7 @@ namespace Golampi\Compiler\ARM64\Traits\Helpers;
  *   Aquí la ubicación siempre es el stack frame [x29 - offset].
  *
  * ✅ CORRECCIÓN FASE 3: Distinción por tamaño de registro
- *   int32/bool/rune → ldr w0, [x29, #-offset]   (32-bit registro)
+ *   int32/bool/rune → ldr x0, [x29, #-offset]   (64-bit registro per AArch64 standard)
  *   float32 → ldr s0, [x29, #-offset]   (32-bit SIMD)
  *   puntero/string/array → ldr x0, [x29, #-offset]   (64-bit registro)
  *
@@ -42,8 +42,8 @@ trait IdentifierVisitor
         if ($type === 'float32') {
             $this->emit("ldr s0, [x29, #-$offset]", "$name (float32)");
         } elseif (in_array($type, ['int32', 'bool', 'rune'])) {
-            // ✅ Usar w0 (32-bit) para tipos enteros
-            $this->emit("ldr w0, [x29, #-$offset]", "$name ($type - 32-bit)");
+            // ✅ Usar x0 (64-bit) para tipos enteros per AArch64 standard
+            $this->emit("ldr x0, [x29, #-$offset]", "$name ($type - 64-bit)");
         } else {
             // Puntero, string, array → x0 (64-bit)
             $this->emit("ldr x0, [x29, #-$offset]", "$name ($type - 64-bit)");

@@ -29,13 +29,13 @@ trait ScalarLiteral
 {
     public function visitTrueLiteral($ctx)
     {
-        $this->emit('mov w0, #1', 'bool true = 1 (32-bit)');
+        $this->emit('mov x0, #1', 'bool true = 1 (64-bit per AArch64)');
         return 'bool';
     }
 
     public function visitFalseLiteral($ctx)
     {
-        $this->emit('mov w0, wzr', 'bool false = 0 (32-bit)');
+        $this->emit('mov x0, xzr', 'bool false = 0 (64-bit per AArch64)');
         return 'bool';
     }
 

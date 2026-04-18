@@ -108,24 +108,24 @@ trait Comparisons
      * Comparación para tipos enteros (int32, bool, rune, string pointer).
      * 
      * Nota sobre optimización:
-     *   - El movimiento "mov w1, w0" es NECESARIO por la arquitectura del compilador
-     *   - El RHS se evalúa siempre a w0 (por el sistema de visitantes)
-     *   - Para comparar necesitamos ambos operandos: uno en w0 y otro en w1
+     *   - El movimiento "mov x1, x0" es NECESARIO por la arquitectura del compilador
+     *   - El RHS se evalúa siempre a x0 (por el sistema de visitantes)
+     *   - Para comparar necesitamos ambos operandos: uno en x0 y otro en x1
      *   - Una optimización futura sería permitir evaluación a registros específicos
      *
-     * Precondición: w0 contiene lhs (evaluado ya en visitEquality/visitRelational)
+     * Precondición: x0 contiene lhs (evaluado ya en visitEquality/visitRelational)
      */
     private function generateIntComparison(string $op, callable $evalRhs): void
     {
-        // ✅ w0 ya contiene lhs (evaluado en visitEquality/visitRelational)
-        // Preservar lhs en w1 para la comparación
-        $this->emit('mov w1, w0');
+        // ✅ x0 ya contiene lhs (evaluado en visitEquality/visitRelational)
+        // Preservar lhs en x1 para la comparación
+        $this->emit('mov x1, x0');
         
-        // Evaluar rhs → w0 (mediante closure)
+        // Evaluar rhs → x0 (mediante closure)
         $evalRhs();
 
         // ✅ cmp setup los flags sin generar cset
-        $this->emit('cmp w1, w0', 'comparar w1(lhs) vs w0(rhs) - flags setup');
+        $this->emit('cmp x1, x0', 'comparar x1(lhs) vs x0(rhs) - flags setup');
         
         // ✅ Marcar comparación simple para que IF/ControlFlow use branch directo
         $this->lastComparison = [

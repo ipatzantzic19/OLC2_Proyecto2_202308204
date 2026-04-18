@@ -18,49 +18,49 @@ _start:
 	# reservar 32 bytes para variables locales
 	# frame.size=32, locals=3
 	# a := expr (tipo inferido)
-	mov w0, #8
-	# int32 literal (32-bit)
-	str w0, [x29, #-8]
-	# guardar int32 inferido (32-bit)
+	mov x0, #8
+	# int32 literal (64-bit per AArch64)
+	str x0, [x29, #-8]
+	# guardar int32 inferido (64-bit)
 	# b := expr (tipo inferido)
-	mov w0, #7
-	# int32 literal (32-bit)
-	str w0, [x29, #-16]
-	# guardar int32 inferido (32-bit)
+	mov x0, #7
+	# int32 literal (64-bit per AArch64)
+	str x0, [x29, #-16]
+	# guardar int32 inferido (64-bit)
 	# var result int32 (valor por defecto)
-	mov w0, wzr
-	# int32 default = 0 (32-bit)
-	str w0, [x29, #-24]
+	mov x0, xzr
+	# int32 default = 0 (64-bit)
+	str x0, [x29, #-24]
 	# if condición #1
-	ldr w0, [x29, #-8]
-	# a (int32 - 32-bit)
-	mov w1, w0
-	ldr w0, [x29, #-16]
-	# b (int32 - 32-bit)
-	cmp w1, w0
-	# comparar w1(lhs) vs w0(rhs) - flags setup
+	ldr x0, [x29, #-8]
+	# a (int32 - 64-bit)
+	mov x1, x0
+	ldr x0, [x29, #-16]
+	# b (int32 - 64-bit)
+	cmp x1, x0
+	# comparar x1(lhs) vs x0(rhs) - flags setup
 	b.le .else_branch_1
 	# branch falso (comparación simple)
 	# result = expr
-	ldr w0, [x29, #-8]
-	# a (int32 - 32-bit)
-	str w0, [x29, #-24]
-	# guardar int32 (32-bit)
+	ldr x0, [x29, #-8]
+	# a (int32 - 64-bit)
+	str x0, [x29, #-24]
+	# guardar int32 (64-bit)
 	b .if_end_0
 	# saltar al final del if
 .else_branch_1:
 	# else
 	# result = expr
-	ldr w0, [x29, #-16]
-	# b (int32 - 32-bit)
-	str w0, [x29, #-24]
-	# guardar int32 (32-bit)
+	ldr x0, [x29, #-16]
+	# b (int32 - 64-bit)
+	str x0, [x29, #-24]
+	# guardar int32 (64-bit)
 .if_end_0:
-	ldr w0, [x29, #-24]
-	# result (int32 - 32-bit)
+	ldr x0, [x29, #-24]
+	# result (int32 - 64-bit)
 	# fmt.Println arg 0 (int32)
-	add w3, w0, #48
-	# convertir int a ASCII (w0 + 48 → w3)
+	add x3, x0, #48
+	# convertir int a ASCII (x0 + 48 → x3)
 	adrp x4, buffer
 	add x4, x4, :lo12:buffer
 	strb w3, [x4]
