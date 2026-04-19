@@ -47,6 +47,7 @@ trait VarDecl
                 if ($arrayInfo !== null) {
                     $this->comment("var $name [" . implode('][', $arrayInfo['dims']) . "]" . $arrayInfo['elem_type'] . " (ya alocado en prescan)");
                     $this->addSymbol($name, 'array', $this->func->name, null, $line, $col);
+                    // TODO: agregar información de dimensiones y tipo de elemento
                 }
                 continue;
             }
@@ -57,6 +58,7 @@ trait VarDecl
 
             $this->comment("var $name $type (valor por defecto)");
             $this->storeDefault($type, $offset);
+            // El valor por defecto se calcula automáticamente en addSymbol
             $this->addSymbol($name, $type, $this->func->name, null, $line, $col);
         }
         return null;
@@ -97,6 +99,7 @@ trait VarDecl
                 $this->storeDefault($type, $offset);
             }
 
+            // El valor se pasará (null en inicialización con expresiones, por defecto se calcula)
             $this->addSymbol($name, $type, $this->func->name, null, $line, $col);
             $idx++;
         }

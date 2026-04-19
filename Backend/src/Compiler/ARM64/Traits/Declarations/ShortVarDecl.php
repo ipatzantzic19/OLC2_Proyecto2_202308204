@@ -95,6 +95,7 @@ trait ShortVarDecl
                 if ($offset !== null) {
                     $this->storeInferredResult($exprType, $offset);
                     $this->func->setType($name, $exprType);
+                    // Pasar null como valor - se usará el por defecto del tipo
                     $this->addSymbol($name, $exprType,
                         $this->func->name, null, $line, $col);
                 }
@@ -169,7 +170,7 @@ trait ShortVarDecl
                 "{$ids[0]} ← x0 (primer retorno)");
             $this->func->setType($ids[0], $type0);
             $this->addSymbol($ids[0], $type0,
-                $this->func->name, null, $line, $col);
+                $this->func->name, null, $line, $col, false);
         }
 
         // Recuperar segundo retorno desde stack → ids[1]
@@ -186,7 +187,7 @@ trait ShortVarDecl
                     "{$ids[1]} ← x1 (segundo retorno)");
                 $this->func->setType($ids[1], $type1);
                 $this->addSymbol($ids[1], $type1,
-                    $this->func->name, null, $line, $col);
+                    $this->func->name, null, $line, $col, false);
             }
         }
 

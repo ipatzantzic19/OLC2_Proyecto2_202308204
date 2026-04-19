@@ -43,6 +43,9 @@ trait RuneLiteral
                         : ord($inner[0]),
         };
 
+        // Capturar valor para la tabla de símbolos
+        $this->lastLiteralValue = ['type' => 'rune', 'value' => $val];
+
         $this->emit("mov x0, #$val", "rune '$inner' = U+$val (64-bit per AArch64)");
         return 'rune';
     }

@@ -320,80 +320,29 @@ trait GenerationPhase
 
     /**
      * Genera una tabla de símbolos para depuración (versión fase).
-     * Llamada al final de generateProgram para registrar todas las variables.
+     * 
+     * ✅ NOTA: Ya no es necesario aquí. Los símbolos se registran correctamente
+     * mediante addSymbol() en ShortVarDecl, VarDecl, ConstDecl, etc. durante la
+     * generación. Este método fue una fallback que causaba duplicados con scope "local".
+     * 
+     * Se mantiene como placeholder para permitir futuras optimizaciones sin
+     * quebrar llamadas externas.
      */
     protected function phaseGenerateSymbolTable(): void
     {
-        // Este método es llamado después de compilar todas las funciones
-        // Necesita generar símbolos usando la información almacenada en
-        // phaseCompileProgram (acceso a objetos FunctionContext guardados)
-
-        // Si tenemos acceso a userFunctions (desde ProgramPhase), usarla
-        if (isset($this->userFunctionContexts) && is_array($this->userFunctionContexts)) {
-            foreach ($this->userFunctionContexts as $funcName => $funcCtx) {
-                $this->addFunctionSymbols($funcCtx, $funcName);
-            }
-        }
-
-        // Si no, intentar usar $this->func si existe
-        if (!isset($this->userFunctionContexts) && isset($this->func)) {
-            $locals = $this->func->getLocals();
-            $arrays = $this->func->getArrays();
-
-            // Registrar variables locales
-            foreach ($locals as $name => $info) {
-                $this->symbolTable[$name] = [
-                    'type'   => $info['type'] ?? 'int32',
-                    'offset' => $info['offset'] ?? 0,
-                    'scope'  => 'local',
-                ];
-            }
-
-            // Registrar arrays
-            foreach ($arrays ?? [] as $name => $info) {
-                $this->symbolTable[$name] = [
-                    'type'   => $info['elem_type'] ?? 'int32',
-                    'offset' => $info['base_offset'] ?? 0,
-                    'scope'  => 'array',
-                    'dims'   => $info['dims'] ?? [],
-                ];
-            }
-        }
+        // Ahora los símbolos se registran directamente durante visitadores,
+        // no aquí. Esto evita duplicados y mantiene los scopes correctos.
     }
 
     /**
      * Agrega símbolos de una función a la tabla de símbolos.
+     * 
+     * ✅ NOTA: Este método también está deprecado por la misma razón.
+     * Los símbolos se registran en tiempo real durante la generación.
      */
     protected function addFunctionSymbols($funcCtx, string $funcName): void
     {
-        // Agregar función misma
-        $this->symbolTable[$funcName] = [
-            'type'   => 'function',
-            'scope'  => 'global',
-        ];
-
-        // Agregar variables locales de la función
-        $locals = $funcCtx->getLocals();
-        foreach ($locals as $name => $info) {
-            $this->symbolTable[$name] = [
-                'type'   => $info['type'] ?? 'int32',
-                'offset' => $info['offset'] ?? 0,
-                'scope'  => 'local',
-                'function' => $funcName,
-            ];
-        }
-
-        // Agregar arrays de la función
-        $arrays = $funcCtx->getArrays();
-        foreach ($arrays ?? [] as $name => $info) {
-            $this->symbolTable[$name] = [
-                'type'   => $info['elem_type'] ?? 'int32',
-                'offset' => $info['base_offset'] ?? 0,
-                'scope'  => 'array',
-                'dims'   => $info['dims'] ?? [],
-                'function' => $funcName,
-            ];
-        }
+        // Deprecado: símbolos se registran via addSymbol() durante la compilación
     }
 }
 

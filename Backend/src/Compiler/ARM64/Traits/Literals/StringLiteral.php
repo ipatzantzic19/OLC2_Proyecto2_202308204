@@ -39,6 +39,9 @@ trait StringLiteral
             $inner
         );
 
+        // Capturar valor para la tabla de símbolos
+        $this->lastLiteralValue = ['type' => 'string', 'value' => $processed];
+
         $label = $this->internString($processed);
         $this->comment('string literal → x0 (puntero)');
         $this->emit("adrp x0, $label");

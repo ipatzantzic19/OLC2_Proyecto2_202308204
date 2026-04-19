@@ -54,7 +54,8 @@ trait ConstDecl
         }
 
         // Registrar en la tabla de símbolos con etiqueta "(const)"
-        $this->addSymbol($name, $type . ' (const)', $this->func->name, null, $line, $col);
+        // Agregar como constante con el valor None (se usa el por defecto)
+        $this->addSymbol($name, $type, $this->func->name, null, $line, $col, true);
         return null;
     }
 

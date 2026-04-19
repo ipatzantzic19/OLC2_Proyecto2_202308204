@@ -25,6 +25,9 @@ trait IntLiteral
     {
         $val = (int) $ctx->INT32()->getText();
 
+        // Capturar valor para la tabla de símbolos
+        $this->lastLiteralValue = ['type' => 'int32', 'value' => $val];
+
         if ($val === 0) {
             $this->emit('mov x0, xzr', 'int32 literal 0 (64-bit per AArch64)');
 

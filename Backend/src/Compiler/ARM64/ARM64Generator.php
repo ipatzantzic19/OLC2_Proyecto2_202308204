@@ -220,6 +220,12 @@ class ARM64Generator extends \GolampiBaseVisitor
     // Permite IF/ControlFlow usar b.EQ, b.LT, etc en lugar de cbz
     protected array $lastComparison = ['isSimple' => false, 'op' => '', 'lhsReg' => '', 'rhsReg' => ''];
 
+    // ── Captura del último valor literal evaluado ──────────────────────────
+    // Se usa para registrar el valor inicial en la tabla de símbolos
+    // Estructura: ['type' => string, 'value' => mixed]
+    // Se resetea a null después de usarse en addSymbol()
+    protected ?array $lastLiteralValue = null;
+
     // ── Funciones de usuario registradas (hoisting) ───────────────────────
     protected array $userFunctions = [];
 
@@ -310,7 +316,8 @@ class ARM64Generator extends \GolampiBaseVisitor
         $params = $this->extractParams($funcDecl);
         foreach ($params as $p) {
             $this->func->allocLocal($p['name'], $p['type'], true);
-            $this->addSymbol($p['name'], $p['type'], $name, 'param', $line, $col);
+            // No agregar parámetros como símbolos separados - se reportan como parte de la función
+            // $this->addSymbol($p['name'], $p['type'], $name, null, $line, $col);
         }
 
         // ── Pasada 1: prescan del bloque (calcular FRAME_SIZE) ────────────

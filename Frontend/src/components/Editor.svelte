@@ -97,12 +97,33 @@
       assemblyCode.set(result.assembly ?? '');
       compileErrors.set(result.errors ?? []);
       
-      // Convertir symbolTable (objeto asociativo) a array de símbolos
-      const symbolTableObj = result.symbolTable ?? {};
-      const symbolsArray = Object.entries(symbolTableObj).map(([key, value]: [string, any]) => ({
-        identifier: key,
-        ...(value && typeof value === 'object' ? value : {}),
-      } as any)).filter((sym: any) => sym.type !== undefined); // Filtrar entradas sin type
+      // Procesar tabla de símbolos: puede ser array o objeto asociativo
+      let symbolsArray = [];
+      const symbolTableData = result.symbolTable ?? {};
+      
+      if (Array.isArray(symbolTableData)) {
+        // Si es array, usarlo directamente
+        symbolsArray = symbolTableData;
+      } else if (typeof symbolTableData === 'object') {
+        // Si es objeto, convertir a array
+        symbolsArray = Object.entries(symbolTableData)
+          .map(([key, value]: [string, any]) => ({
+            identifier: key,
+            ...(value && typeof value === 'object' ? value : {}),
+          } as any))
+          .filter((sym: any) => sym.type !== undefined);
+      }
+      
+      // Ordenar por línea, columna, y orden de declaración
+      symbolsArray.sort((a: any, b: any) => {
+        const lineCmp = (a.line ?? 0) - (b.line ?? 0);
+        if (lineCmp !== 0) return lineCmp;
+        
+        const colCmp = (a.column ?? 0) - (b.column ?? 0);
+        if (colCmp !== 0) return colCmp;
+        
+        return (a.order ?? 0) - (b.order ?? 0);
+      });
       
       compileSymbols.set(symbolsArray);
       compileSuccess.set(result.success);

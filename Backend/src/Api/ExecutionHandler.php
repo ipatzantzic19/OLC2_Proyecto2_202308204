@@ -185,7 +185,35 @@ class ExecutionHandler
     
     private function formatSymbols(array $symbols): array
     {
-        return array_map(function($symbol) {
+        $formatted = [];
+        $seenIdentifiers = []; // Rastrear identificadores únicos para evitar duplicados
+        
+        foreach ($symbols as $symbol) {
+            // Solo procesar símbolos que sean arrays con 'identifier' válido
+            if (!is_array($symbol)) {
+                continue; // Saltar no-arrays
+            }
+            
+            // Evitar duplicados por identificador + scope
+            $identifier = $symbol['identifier'] ?? '';
+            $scope = $symbol['scope'] ?? 'global';
+            
+            // Saltar identificadores vacíos o especiales
+            if (empty($identifier) || $identifier === 'param' || $identifier === '_start') {
+                continue;
+            }
+            
+            // Saltar si es un diccionario sin identificador legítimo (estructura interna)
+            if (!isset($symbol['identifier']) || !is_string($symbol['identifier'])) {
+                continue;
+            }
+            
+            $key = "$identifier:$scope";
+            if (isset($seenIdentifiers[$key])) {
+                continue; // Saltar duplicado
+            }
+            $seenIdentifiers[$key] = true;
+            
             $value = $symbol['value'];
             if ($value instanceof Value) {
                 $valueStr = $value->toString();
@@ -193,14 +221,25 @@ class ExecutionHandler
                 $valueStr = $value === null ? 'nil' : (string)$value;
             }
             
-            return [
-                'identifier' => $symbol['identifier'] ?? '',
+            // Convertir booleanos a string legible
+            if ($valueStr === '1') {
+                $valueStr = 'true';
+            } elseif ($valueStr === '' && $symbol['type'] === 'bool') {
+                $valueStr = 'false';
+            }
+            
+            $formatted[] = [
+                'id' => count($formatted) + 1,  // Agregar número de secuencia
+                'identifier' => $identifier,
                 'type' => $symbol['type'] ?? '',
-                'scope' => $symbol['scope'] ?? 'global',
+                'scope' => $scope,
                 'value' => $valueStr,
                 'line' => $symbol['line'] ?? 0,
-                'column' => $symbol['column'] ?? 0
+                'column' => $symbol['column'] ?? 0,
+                'isConstant' => $symbol['isConstant'] ?? false
             ];
-        }, $symbols);
+        }
+        
+        return $formatted;
     }
 }

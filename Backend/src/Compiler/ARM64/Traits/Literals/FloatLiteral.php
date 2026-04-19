@@ -32,6 +32,9 @@ trait FloatLiteral
         $val   = (float) $text;
         $label = $this->internFloat($val);  // internado en FloatPool
 
+        // Capturar valor para la tabla de símbolos
+        $this->lastLiteralValue = ['type' => 'float32', 'value' => $val];
+
         $this->comment("float32 literal $text → s0");
         $this->emit("adrp x9, $label",               'página de la constante float');
         $this->emit("ldr s0, [x9, :lo12:$label]",    'cargar float32 IEEE-754 en s0');
