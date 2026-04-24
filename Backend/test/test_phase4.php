@@ -33,6 +33,32 @@ const RESET  = "\033[0m";
 const BOLD   = "\033[1m";
 
 /**
+ * Verifica si un comando existe en PATH.
+ */
+function command_exists(string $command): bool
+{
+    $output = [];
+    $exitCode = 1;
+    exec('command -v ' . escapeshellarg($command) . ' >/dev/null 2>&1', $output, $exitCode);
+    return $exitCode === 0;
+}
+
+/**
+ * Ejecuta un comando de shell y retorna salida + código de salida.
+ */
+function run_shell_command(string $command): array
+{
+    $output = [];
+    $exitCode = 1;
+    exec($command . ' 2>&1', $output, $exitCode);
+
+    return [
+        'output' => implode("\n", $output),
+        'exitCode' => $exitCode,
+    ];
+}
+
+/**
  * FASE 1: Compilar archivo .go a assembly ARM64
  */
 function phase1_compile(string $sourceFile): array
@@ -214,6 +240,7 @@ function phase4_execute(string $objectFile): array
         'success' => false,
         'executable' => '',
         'message' => '',
+        'linkOutput' => '',
         'executionOutput' => '',
         'exitCode' => -1
     ];
@@ -227,63 +254,114 @@ function phase4_execute(string $objectFile): array
         $base = pathinfo($objectFile, PATHINFO_FILENAME);
         $executable = "$dir/$base";
 
-        // Intenta diferentes linkers
-        $linkers = [
-            'aarch64-linux-gnu-ld',
-            'ld'
-        ];
+        // Para resolver referencias a printf se debe enlazar con runtime/libc.
+        // Como el assembly define _start, primero se prueban variantes con -nostartfiles.
+        $linkAttempts = [];
+        if (command_exists('aarch64-linux-gnu-gcc')) {
+            $linkAttempts[] = [
+                'tool' => 'aarch64-linux-gnu-gcc',
+                'cmd' => 'aarch64-linux-gnu-gcc -nostartfiles -static -o ' . escapeshellarg($executable) . ' ' . escapeshellarg($objectFile) . ' -lc',
+            ];
+            $linkAttempts[] = [
+                'tool' => 'aarch64-linux-gnu-gcc',
+                'cmd' => 'aarch64-linux-gnu-gcc -nostartfiles -o ' . escapeshellarg($executable) . ' ' . escapeshellarg($objectFile) . ' -lc',
+            ];
+            $linkAttempts[] = [
+                'tool' => 'aarch64-linux-gnu-gcc',
+                'cmd' => 'aarch64-linux-gnu-gcc -static -o ' . escapeshellarg($executable) . ' ' . escapeshellarg($objectFile),
+            ];
+            $linkAttempts[] = [
+                'tool' => 'aarch64-linux-gnu-gcc',
+                'cmd' => 'aarch64-linux-gnu-gcc -o ' . escapeshellarg($executable) . ' ' . escapeshellarg($objectFile),
+            ];
+        }
+        if (command_exists('aarch64-linux-gnu-ld')) {
+            $linkAttempts[] = [
+                'tool' => 'aarch64-linux-gnu-ld',
+                'cmd' => 'aarch64-linux-gnu-ld -static -o ' . escapeshellarg($executable) . ' ' . escapeshellarg($objectFile),
+            ];
+        }
 
-        $linkCmd = null;
-        $usedLinker = null;
+        if (empty($linkAttempts)) {
+            throw new Exception('No se encontró linker cruzado. Instala: gcc-aarch64-linux-gnu (recomendado) o binutils-aarch64-linux-gnu');
+        }
 
-        foreach ($linkers as $ld) {
-            if (shell_exec("which $ld 2>/dev/null")) {
-                $usedLinker = $ld;
-                $linkCmd = "$ld -static -o $executable $objectFile 2>&1";
+        echo BLUE . "🔗 Linkeditando..." . RESET . "\n";
+
+        $linked = false;
+        $attemptLogs = [];
+        foreach ($linkAttempts as $attempt) {
+            echo BLUE . "⚙️  Probando:" . RESET . " {$attempt['cmd']}\n";
+            $linkRun = run_shell_command($attempt['cmd']);
+
+            $attemptLogs[] =
+                "[{$attempt['tool']}] {$attempt['cmd']}\n" .
+                "exit={$linkRun['exitCode']}\n" .
+                ($linkRun['output'] !== '' ? $linkRun['output'] : '(sin salida)');
+
+            if ($linkRun['exitCode'] === 0 && file_exists($executable)) {
+                $linked = true;
+                $result['linkOutput'] = implode("\n\n", $attemptLogs);
+                echo BLUE . "🔧 Linker usado:" . RESET . " {$attempt['tool']}\n";
                 break;
             }
         }
 
-        if ($linkCmd === null) {
-            throw new Exception("No se encontró linker (intenta: apt install binutils-aarch64-linux-gnu)");
-        }
-
-        echo BLUE . "🔗 Usando linker:" . RESET . " $usedLinker\n";
-        echo BLUE . "⚙️  Linkeditando..." . RESET . "\n";
-
-        $linkOutput = shell_exec($linkCmd);
-
-        if (!file_exists($executable)) {
-            // Es posible que no se necesite linker en bare-metal, intentar ejecutar el .o directamente
-            echo YELLOW . "⚠️  No se pudo crear ejecutable, intentando ejecutar .o directamente..." . RESET . "\n";
-            $executable = $objectFile;
+        if (!$linked) {
+            $result['linkOutput'] = implode("\n\n", $attemptLogs);
+            throw new Exception("No se pudo crear el ejecutable.\n" . $result['linkOutput']);
         }
 
         // Hacer ejecutable
         chmod($executable, 0755);
 
-        echo BLUE . "🚀 Ejecutando:" . RESET . " " . basename($executable) . "\n";
+        $machine = strtolower(php_uname('m'));
+        $isArmHost = str_contains($machine, 'aarch64') || str_contains($machine, 'arm64');
 
-        // Ejecutar el binario
-        $output = shell_exec("$executable 2>&1");
-        $result['executionOutput'] = $output ?? '';
+        if ($isArmHost) {
+            $runCmd = escapeshellarg($executable);
+        } else {
+            if (!command_exists('qemu-aarch64')) {
+                throw new Exception(
+                    "El ejecutable es ARM64 y este host es '$machine'. " .
+                    "Instala qemu-user (qemu-aarch64) para poder ejecutarlo."
+                );
+            }
 
-        // Obtener código de salida
-        $lastCommand = shell_exec("echo $?");
-        $result['exitCode'] = (int)trim($lastCommand ?? "-1");
+            $qemuPrefix = is_dir('/usr/aarch64-linux-gnu')
+                ? 'qemu-aarch64 -L /usr/aarch64-linux-gnu '
+                : 'qemu-aarch64 ';
+            $runCmd = $qemuPrefix . escapeshellarg($executable);
+        }
+
+        if (command_exists('timeout')) {
+            $runCmd = 'timeout 8s ' . $runCmd;
+        }
+
+        echo BLUE . "🚀 Ejecutando:" . RESET . " $runCmd\n";
+
+        $runResult = run_shell_command($runCmd);
+        $result['executionOutput'] = $runResult['output'];
+        $result['exitCode'] = $runResult['exitCode'];
 
         $result['executable'] = $executable;
-        $result['success'] = true;
+        $result['success'] = $result['exitCode'] === 0;
 
-        if (!empty($output)) {
+        if (!empty($result['executionOutput'])) {
             echo BLUE . "📤 Salida del programa:" . RESET . "\n";
-            echo $output . "\n";
+            echo $result['executionOutput'] . "\n";
         } else {
             echo YELLOW . "⚠️  El programa no produjo salida" . RESET . "\n";
         }
 
         echo BLUE . "📊 Código de salida:" . RESET . " " . $result['exitCode'] . "\n";
-        echo GREEN . "✅ Ejecución completada" . RESET . "\n";
+        if ($result['success']) {
+            echo GREEN . "✅ Ejecución completada" . RESET . "\n";
+        } elseif ($result['exitCode'] === 124) {
+            echo RED . "❌ Tiempo límite excedido (timeout 8s). Posible bucle infinito." . RESET . "\n";
+        } else {
+            echo RED . "❌ El programa terminó con error" . RESET . "\n";
+        }
 
     } catch (Throwable $e) {
         $result['message'] = "Error: " . $e->getMessage();

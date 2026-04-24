@@ -86,6 +86,7 @@ trait PrescanPhase
                     break;
                     
                 case 'ShortVarDeclContext':
+                case 'ShortVarDeclarationContext':
                     $this->prescanShortVarDecl($child);
                     break;
                 case 'ConstDeclContext':
@@ -97,11 +98,27 @@ trait PrescanPhase
                     $this->phasePrescanBlock($child);
                     break;
                 case 'IfStmtContext':
-                case 'ForStmtContext':
                 case 'SwitchStmtContext':
                     // Control flow: escanear el bloque del bodyif existe
                     if (method_exists($child, 'block')) {
                         $this->phasePrescanBlock($child->block());
+                    }
+                    break;
+
+                case 'ForStmtContext':
+                case 'ForTraditionalContext':
+                case 'ForWhileContext':
+                case 'ForInfiniteContext':
+                    // Importante: en for-init pueden declararse variables (i := 0)
+                    // que deben contarse en el frame antes de generar código.
+                    $this->phasePrescanBlock($child);
+                    break;
+
+                default:
+                    // Recursión defensiva: permite descubrir declaraciones anidadas
+                    // en nodos intermedios no cubiertos explícitamente.
+                    if (method_exists($child, 'getChildCount')) {
+                        $this->phasePrescanBlock($child);
                     }
                     break;
             }

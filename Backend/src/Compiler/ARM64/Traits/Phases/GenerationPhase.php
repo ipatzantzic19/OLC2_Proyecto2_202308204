@@ -85,6 +85,7 @@ trait GenerationPhase
 
         // Reservar espacio en stack para locals y arrays
         $frameSize = $this->func->getFrameSize();
+        $this->activeFrameSize = $frameSize;
         if ($frameSize > 0) {
             // AArch64 requiere alineación a 16 bytes para sub
             $this->emit("sub sp, sp, #{$frameSize}", "reservar {$frameSize} bytes para variables locales");
@@ -177,11 +178,15 @@ trait GenerationPhase
         // BARE-METAL: Si es _start, usar exit syscall
         if ($this->func->name === '_start') {
             // ✅ EPÍLOGO COMPLETO: restaurar stack frame antes de exit (completitud académica)
-            $frameSize = $this->func->getFrameSize();
+            $frameSize = $this->activeFrameSize ?? $this->func->getFrameSize();
             if ($frameSize > 0) {
                 $this->emit("add sp, sp, #{$frameSize}", 'restaurar stack pointer');
             }
             $this->emit('ldp x29, x30, [sp], #16', 'restaurar frame pointer y link register');
+
+            // Si se usó printf, forzar flush antes de salir por syscall directo.
+            $this->emit('mov x0, xzr',      'fflush(NULL)');
+            $this->emit('bl fflush',        'vaciar buffers stdio');
             
             // Syscalls de salida
             $this->emit('mov x0, #0',        'exit code = 0');
@@ -197,7 +202,7 @@ trait GenerationPhase
         }
 
         // Liberar stack frame
-        $frameSize = $this->func->getFrameSize();
+        $frameSize = $this->activeFrameSize ?? $this->func->getFrameSize();
         if ($frameSize > 0) {
             $this->emit("add sp, sp, #{$frameSize}");
         }
@@ -221,6 +226,7 @@ trait GenerationPhase
         // Cambiar contexto de función
         $oldFunc = $this->func;
         $this->func = $functionContext;
+        $this->activeFrameSize = null;
 
         // Prescan de parámetros (si la función los tiene)
         $this->phasePrescanFunctionParams($funcCtx);
@@ -251,6 +257,7 @@ trait GenerationPhase
 
         // Restaurar contexto anterior
         $this->func = $oldFunc;
+        $this->activeFrameSize = null;
     }
 
     /**

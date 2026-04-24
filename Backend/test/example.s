@@ -5,6 +5,8 @@ buffer:
     .ascii "0\n"
 len = . - buffer
 
+.str_0: .string "%ld"
+
 .section .text
 .align 2
 .global _start
@@ -59,18 +61,19 @@ _start:
 	ldr x0, [x29, #-24]
 	# result (int32 - 64-bit)
 	# fmt.Println arg 0 (int32)
-	add x3, x0, #48
-	# convertir int a ASCII (x0 + 48 → x3)
-	adrp x4, buffer
-	add x4, x4, :lo12:buffer
-	strb w3, [x4]
-	# guardar ASCII en buffer[0]
+	mov x1, x0
+	# int32 → x1 para printf %ld
+	adrp x0, .str_0
+	add x0, x0, :lo12:.str_0
+	bl printf
+	adrp x4, msg
+	add x4, x4, :lo12:msg
 	mov x0, #1
 	# fd = stdout
 	mov x1, x4
-	# buffer
-	mov x2, #2
-	# length = 2 (digit + newline)
+	# buffer = msg
+	mov x2, #1
+	# length = 1 (just newline)
 	mov x8, #64
 	# syscall write
 	svc #0
@@ -79,6 +82,10 @@ _start:
 	# restaurar stack pointer
 	ldp x29, x30, [sp], #16
 	# restaurar frame pointer y link register
+	mov x0, xzr
+	# fflush(NULL)
+	bl fflush
+	# vaciar buffers stdio
 	mov x0, #0
 	# exit code = 0
 	mov x8, #93

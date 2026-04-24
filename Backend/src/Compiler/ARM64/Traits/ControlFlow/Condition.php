@@ -96,8 +96,8 @@ trait Condition
     private function resolveBranchCondition(string $op): string
     {
         return match ($op) {
-            '==' => 'eq',   // branch if equal
-            '!=' => 'ne',   // branch if not equal
+            '==' => 'ne',   // branch if NOT == (invierte para el else)
+            '!=' => 'eq',   // branch if NOT != (invierte para el else)
             '>'  => 'le',   // branch if NOT >  (invierte para el else)
             '>=' => 'lt',   // branch if NOT >= (invierte para el else)
             '<'  => 'ge',   // branch if NOT <  (invierte para el else)

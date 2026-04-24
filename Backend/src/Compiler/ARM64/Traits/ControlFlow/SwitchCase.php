@@ -15,11 +15,11 @@ namespace Golampi\Compiler\ARM64\Traits\ControlFlow;
  * Estrategia de compilación (tabla de saltos lineal):
  *
  *   [eval switch expr]      // resultado en x0
- *   mov x19, x0             // guardar en callee-saved (no lo pisa el eval de cases)
+ *   mov x9, x0              // guardar en caller-saved para comparaciones del switch
  *
- *   [eval case v1] → cmp x19, x0 → b.eq .sw_case_0
- *   [eval case v2] → cmp x19, x0 → b.eq .sw_case_0
- *   [eval case v3] → cmp x19, x0 → b.eq .sw_case_1
+ *   [eval case v1] → cmp x9, x0 → b.eq .sw_case_0
+ *   [eval case v2] → cmp x9, x0 → b.eq .sw_case_0
+ *   [eval case v3] → cmp x9, x0 → b.eq .sw_case_1
  *   b .sw_default
  *
  *   .sw_case_0:  [body case 0] → b .sw_end
@@ -30,7 +30,7 @@ namespace Golampi\Compiler\ARM64\Traits\ControlFlow;
  * Notas de compiladores (Aho et al.):
  *   - Golampi NO tiene fallthrough (a diferencia de C). Cada case termina con
  *     un salto implícito al final del switch.
- *   - x19 es callee-saved en AArch64 → seguro de usar durante la tabla de saltos.
+ *   - Se usa x9 (caller-saved) solo dentro del dispatch del switch.
  *   - Para switches con muchos casos, una tabla de saltos real (jump table)
  *     sería más eficiente, pero la búsqueda lineal es correcta y más simple
  *     para el alcance de este proyecto.
@@ -47,8 +47,8 @@ trait SwitchCase
         // ── Evaluar expresión del switch ──────────────────────────────────
         $this->comment('switch — evaluar expresión de control');
         $this->visit($ctx->expression());
-        // x19 es callee-saved: no se corrompe durante la evaluación de cases
-        $this->emit('mov x19, x0', 'valor del switch → x19 (callee-saved)');
+        // x9 vive durante el dispatch lineal del switch
+        $this->emit('mov x9, x0', 'valor del switch → x9');
 
         $cases    = $ctx->caseClause();
         $default_ = $ctx->defaultClause();
@@ -72,7 +72,7 @@ trait SwitchCase
             // Iterar sobre los valores del case (separados por coma)
             for ($i = 0; $i < $exprList->getChildCount(); $i += 2) {
                 $this->visit($exprList->getChild($i));  // valor → x0
-                $this->emit('cmp x19, x0', "comparar switch vs case[$k]");
+                $this->emit('cmp x9, x0', "comparar switch vs case[$k]");
                 $this->emit("b.eq {$caseLabels[$k]}", 'coincide → saltar al cuerpo');
             }
         }

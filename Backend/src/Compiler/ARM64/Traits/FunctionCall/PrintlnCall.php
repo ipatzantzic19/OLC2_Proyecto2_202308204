@@ -42,7 +42,6 @@ trait PrintlnCall
         }
 
         $n = count($argCtxList);
-        $lastType = 'int32';
 
         for ($i = 0; $i < $n; $i++) {
             $isLast  = ($i === $n - 1);
@@ -61,17 +60,10 @@ trait PrintlnCall
             $this->comment("fmt.Println arg $i ($type)");
             $this->generatePrintValue($type, $sep);
 
-            if ($isLast) {
-                $lastType = $type;
-            }
         }
 
-        // BARE-METAL: Para int32, printInt ya escribe dígito + newline (2 bytes)
-        // No hay que llamar emitPrintNewline adicional
-        // Para otros tipos (string, bool, float), sí hay que escribir newline después
-        if ($lastType !== 'int32') {
-            $this->emitPrintNewline();
-        }
+        // fmt.Println siempre termina con salto de línea, sin importar el tipo.
+        $this->emitPrintNewline();
     }
 
     /**
@@ -95,19 +87,11 @@ trait PrintlnCall
 
     private function printInt(string $suffix): void
     {
-        // ✅ CORRECCIÓN: Usar w-registers para int32 (32-bit)
-        // Bare-metal: convertir int a ASCII (valor en w0 tras fmt.Println)
-        $this->emit('add x3, x0, #48',              'convertir int a ASCII (x0 + 48 → x3)');
-        $this->emit('adrp x4, buffer');
-        $this->emit('add x4, x4, :lo12:buffer');
-        $this->emit('strb w3, [x4]',                'guardar ASCII en buffer[0]');
-        
-        // Syscall write(1, buffer, 2)
-        $this->emit('mov x0, #1',                   'fd = stdout');
-        $this->emit('mov x1, x4',                   'buffer');
-        $this->emit('mov x2, #2',                   'length = 2 (digit + newline)');
-        $this->emit('mov x8, #64',                  'syscall write');
-        $this->emit('svc #0',                       'invoke');
+        $fmt = $this->internString('%ld' . $suffix);
+        $this->emit('mov x1, x0',                   'int32 → x1 para printf %ld');
+        $this->emit("adrp x0, $fmt");
+        $this->emit("add x0, x0, :lo12:$fmt");
+        $this->emit('bl printf');
     }
 
     private function printFloat(string $suffix): void
@@ -135,30 +119,29 @@ trait PrintlnCall
         $doneLabel  = $this->newLabel('bool_done');
         $falseStr   = $this->internString('false');
         $trueStr    = $this->internString('true');
+        $fmt        = $this->internString('%s' . $suffix);
 
         $this->emit("cbnz x0, $trueLabel",        'si true → imprimir "true"');
-        
-        // Print "false"
+
+        // Print "false" con printf para mantener orden de buffer stdio.
         $this->emit("adrp x0, $falseStr");
         $this->emit("add x0, x0, :lo12:$falseStr");
-        $this->emit('mov x1, x0',           'buffer');
-        $this->emit('mov x2, #5',           'length = strlen("false")');
-        $this->emit('mov x0, #1',           'fd = stdout');
-        $this->emit('mov x8, #64',          'syscall write');
-        $this->emit('svc #0',               'invoke');
+        $this->emit('mov x1, x0',           'bool string → x1');
+        $this->emit("adrp x0, $fmt");
+        $this->emit("add x0, x0, :lo12:$fmt");
+        $this->emit('bl printf');
         $this->emit("b $doneLabel");
-        
+
         $this->label($trueLabel);
-        
-        // Print "true"
+
+        // Print "true" con printf para mantener orden de buffer stdio.
         $this->emit("adrp x0, $trueStr");
         $this->emit("add x0, x0, :lo12:$trueStr");
-        $this->emit('mov x1, x0',           'buffer');
-        $this->emit('mov x2, #4',           'length = strlen("true")');
-        $this->emit('mov x0, #1',           'fd = stdout');
-        $this->emit('mov x8, #64',          'syscall write');
-        $this->emit('svc #0',               'invoke');
-        
+        $this->emit('mov x1, x0',           'bool string → x1');
+        $this->emit("adrp x0, $fmt");
+        $this->emit("add x0, x0, :lo12:$fmt");
+        $this->emit('bl printf');
+
         $this->label($doneLabel);
     }
 
@@ -173,13 +156,10 @@ trait PrintlnCall
 
     private function emitPrintNewline(): void
     {
-        // Bare-metal: newline via syscall
-        $this->emit('adrp x4, msg');
-        $this->emit('add x4, x4, :lo12:msg');
-        $this->emit('mov x0, #1',                   'fd = stdout');
-        $this->emit('mov x1, x4',                   'buffer = msg');
-        $this->emit('mov x2, #1',                   'length = 1 (just newline)');
-        $this->emit('mov x8, #64',                  'syscall write');
-        $this->emit('svc #0',                       'invoke');
+        // Usar printf para no mezclar buffers de libc con syscalls directas.
+        $fmt = $this->internString("\n");
+        $this->emit("adrp x0, $fmt");
+        $this->emit("add x0, x0, :lo12:$fmt");
+        $this->emit('bl printf');
     }
 }

@@ -211,6 +211,9 @@ class ARM64Generator extends \GolampiBaseVisitor
     // ── Contexto de función actual ────────────────────────────────────────
     protected ?FunctionContext $func = null;
 
+    // ── Frame size fijado durante prólogo (consistencia prologue/epilogue) ─
+    protected ?int $activeFrameSize = null;
+
     // ── Pila de contexto de bucles (para break/continue) ──────────────────
     // Cada entrada: ['break' => label, 'continue' => label]
     protected array $loopStack = [];

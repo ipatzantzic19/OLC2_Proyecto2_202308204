@@ -52,7 +52,13 @@ trait ForClassic
         if ($cond !== null) {
             $this->comment('for condición');
             $this->visit($cond);
-            $this->emit("cbz x0, $endLabel", 'falso salir del bucle');
+            if (($this->lastComparison['isSimple'] ?? false) === true) {
+                $condBranch = $this->resolveForClassicLoopBranchCondition($this->lastComparison['op'] ?? '==');
+                $this->emit("b.$condBranch $endLabel", 'falso salir del bucle (comparación simple)');
+                $this->lastComparison['isSimple'] = false;
+            } else {
+                $this->emit("cbz x0, $endLabel", 'falso salir del bucle');
+            }
         }
 
         // ── Cuerpo del bucle ─────────────────────────────────────────────
@@ -118,6 +124,23 @@ trait ForClassic
                 // vacío permitido
             }
         }
+    }
+
+    /**
+     * Convierte operador de comparación a branch de salida de bucle
+     * cuando la condición es falsa.
+     */
+    private function resolveForClassicLoopBranchCondition(string $op): string
+    {
+        return match ($op) {
+            '==' => 'ne',
+            '!=' => 'eq',
+            '>'  => 'le',
+            '>=' => 'lt',
+            '<'  => 'ge',
+            '<=' => 'gt',
+            default => 'eq',
+        };
     }
 
     // ── Visitors requeridos por GolampiBaseVisitor ────────────────────────

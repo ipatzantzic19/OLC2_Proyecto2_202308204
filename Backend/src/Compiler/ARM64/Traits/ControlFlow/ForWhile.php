@@ -39,7 +39,13 @@ trait ForWhile
         $this->label($startLabel);
         $this->comment('for-while condición');
         $this->visit($ctx->expression());
-        $this->emit("cbz x0, $endLabel", 'falso salir');
+        if (($this->lastComparison['isSimple'] ?? false) === true) {
+            $condBranch = $this->resolveForWhileLoopBranchCondition($this->lastComparison['op'] ?? '==');
+            $this->emit("b.$condBranch $endLabel", 'falso salir (comparación simple)');
+            $this->lastComparison['isSimple'] = false;
+        } else {
+            $this->emit("cbz x0, $endLabel", 'falso salir');
+        }
 
         $this->generateBlock($ctx->block());
 
@@ -48,5 +54,22 @@ trait ForWhile
 
         array_pop($this->loopStack);
         return null;
+    }
+
+    /**
+     * Convierte operador de comparación a branch de salida de bucle
+     * cuando la condición es falsa.
+     */
+    private function resolveForWhileLoopBranchCondition(string $op): string
+    {
+        return match ($op) {
+            '==' => 'ne',
+            '!=' => 'eq',
+            '>'  => 'le',
+            '>=' => 'lt',
+            '<'  => 'ge',
+            '<=' => 'gt',
+            default => 'eq',
+        };
     }
 }
