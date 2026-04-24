@@ -59,6 +59,34 @@ function run_shell_command(string $command): array
 }
 
 /**
+ * Crea la estructura de artefactos para un archivo fuente.
+ */
+function ensure_artifact_structure(string $sourceFile): array
+{
+    $dir = dirname($sourceFile);
+    $base = pathinfo($sourceFile, PATHINFO_FILENAME);
+
+    $artifactRoot = "$dir/generated/$base";
+    $srcDir = "$artifactRoot/src";
+    $buildDir = "$artifactRoot/build";
+
+    if (!is_dir($srcDir) && !mkdir($srcDir, 0775, true) && !is_dir($srcDir)) {
+        throw new Exception("No se pudo crear directorio: $srcDir");
+    }
+
+    if (!is_dir($buildDir) && !mkdir($buildDir, 0775, true) && !is_dir($buildDir)) {
+        throw new Exception("No se pudo crear directorio: $buildDir");
+    }
+
+    return [
+        'artifactRoot' => $artifactRoot,
+        'srcDir' => $srcDir,
+        'buildDir' => $buildDir,
+        'base' => $base,
+    ];
+}
+
+/**
  * FASE 1: Compilar archivo .go a assembly ARM64
  */
 function phase1_compile(string $sourceFile): array
@@ -132,9 +160,12 @@ function phase2_save_assembly(string $sourceFile, string $assembly): array
     ];
 
     try {
-        $dir = dirname($sourceFile);
-        $base = pathinfo($sourceFile, PATHINFO_FILENAME);
-        $assemblyFile = "$dir/$base.s";
+        $structure = ensure_artifact_structure($sourceFile);
+        $artifactRoot = $structure['artifactRoot'];
+        $srcDir = $structure['srcDir'];
+        $base = $structure['base'];
+
+        $assemblyFile = "$srcDir/$base.s";
 
         $bytesWritten = file_put_contents($assemblyFile, $assembly);
         if ($bytesWritten === false) {
@@ -145,6 +176,7 @@ function phase2_save_assembly(string $sourceFile, string $assembly): array
         $result['success'] = true;
 
         echo BLUE . "💾 Archivo guardado:" . RESET . " " . basename($assemblyFile) . "\n";
+        echo BLUE . "📁 Carpeta de artefactos:" . RESET . " $artifactRoot\n";
         echo BLUE . "📊 Tamaño:" . RESET . " $bytesWritten bytes\n";
         echo GREEN . "✅ Assembly guardado correctamente" . RESET . "\n";
 
@@ -177,9 +209,16 @@ function phase3_assemble(string $assemblyFile): array
             throw new Exception("Archivo .s no encontrado: $assemblyFile");
         }
 
-        $dir = dirname($assemblyFile);
+        $srcDir = dirname($assemblyFile);
+        $artifactRoot = dirname($srcDir);
+        $buildDir = "$artifactRoot/build";
+
+        if (!is_dir($buildDir) && !mkdir($buildDir, 0775, true) && !is_dir($buildDir)) {
+            throw new Exception("No se pudo crear directorio build: $buildDir");
+        }
+
         $base = pathinfo($assemblyFile, PATHINFO_FILENAME);
-        $objectFile = "$dir/$base.o";
+        $objectFile = "$buildDir/$base.o";
 
         // Intenta diferentes ensambladores
         $assemblers = [
@@ -384,6 +423,14 @@ $sourceFile = $argv[1] ?? __DIR__ . '/example.go';
 if (!file_exists($sourceFile)) {
     echo RED . "❌ Archivo no encontrado: $sourceFile" . RESET . "\n";
     echo "\nUso: php test_phase4.php [archivo.go]\n";
+    exit(1);
+}
+
+try {
+    $structure = ensure_artifact_structure($sourceFile);
+    echo BLUE . "📁 Carpeta de artefactos:" . RESET . " " . $structure['artifactRoot'] . "\n";
+} catch (Throwable $e) {
+    echo RED . "❌ " . $e->getMessage() . RESET . "\n";
     exit(1);
 }
 

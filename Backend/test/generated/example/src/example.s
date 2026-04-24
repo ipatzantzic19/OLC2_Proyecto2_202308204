@@ -6,6 +6,7 @@ buffer:
 len = . - buffer
 
 .str_0: .string "%ld"
+.str_1: .string "\n"
 
 .section .text
 .align 2
@@ -66,18 +67,9 @@ _start:
 	adrp x0, .str_0
 	add x0, x0, :lo12:.str_0
 	bl printf
-	adrp x4, msg
-	add x4, x4, :lo12:msg
-	mov x0, #1
-	# fd = stdout
-	mov x1, x4
-	# buffer = msg
-	mov x2, #1
-	# length = 1 (just newline)
-	mov x8, #64
-	# syscall write
-	svc #0
-	# invoke
+	adrp x0, .str_1
+	add x0, x0, :lo12:.str_1
+	bl printf
 	add sp, sp, #32
 	# restaurar stack pointer
 	ldp x29, x30, [sp], #16
