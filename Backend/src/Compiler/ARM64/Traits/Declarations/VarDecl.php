@@ -46,6 +46,16 @@ trait VarDecl
                 $arrayInfo = $this->func->getArrayInfo($name);
                 if ($arrayInfo !== null) {
                     $this->comment("var $name [" . implode('][', $arrayInfo['dims']) . "]" . $arrayInfo['elem_type'] . " (ya alocado en prescan)");
+
+                    // Inicialización por defecto del array a cero/nil.
+                    $baseOffset = $arrayInfo['base_offset'] ?? 0;
+                    $totalSlots = $arrayInfo['total_slots'] ?? 0;
+                    for ($slot = 0; $slot < $totalSlots; $slot++) {
+                        $offset = $baseOffset + ($slot * 8);
+                        $this->emit('mov x0, xzr', "array default slot $slot = 0");
+                        $this->emit("str x0, [x29, #-$offset]");
+                    }
+
                     $this->addSymbol($name, 'array', $this->func->name, null, $line, $col);
                     // TODO: agregar información de dimensiones y tipo de elemento
                 }

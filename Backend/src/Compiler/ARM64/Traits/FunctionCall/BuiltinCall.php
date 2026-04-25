@@ -38,12 +38,22 @@ trait BuiltinCall
         $exprCtx = $this->extractExpr($argCtx);
         $type    = $this->visit($exprCtx ?? $argCtx) ?? 'string';
 
+        if ($type === 'array') {
+            $name = $this->lastArrayName ?? null;
+            if ($name !== null && $this->func && $this->func->hasArray($name)) {
+                $totalSlots = $this->func->getArrayTotalSlots($name);
+                $this->emit('mov x0, #' . $totalSlots, 'len(array) → tamaño real');
+                return 'int32';
+            }
+
+            // Si no se pudo resolver por nombre, usar el comportamiento conocido.
+            $this->emit('mov x0, xzr', 'len(array) — Fase 3');
+            return 'int32';
+        }
+
         if ($type === 'string') {
             $this->comment('len(string) → strlen');
             $this->emit('bl strlen', 'strlen(x0) → longitud en x0');
-        } elseif ($type === 'array') {
-            // Fase 3: el tamaño del array es conocido en compile-time
-            $this->emit('mov x0, xzr', 'len(array) — Fase 3');
         } else {
             $this->emit('mov x0, xzr', "len($type) no soportado");
         }

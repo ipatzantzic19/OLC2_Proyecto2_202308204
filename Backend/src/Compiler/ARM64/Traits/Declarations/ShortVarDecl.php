@@ -91,6 +91,16 @@ trait ShortVarDecl
                 $this->comment("$name := expr (tipo inferido)");
                 $exprType = $this->visit($exprNodes[$i]) ?? 'int32';
 
+                // Si el id ya fue registrado como array en prescan (ej: a := [5]int32{...}),
+                // no intentar alocarlo como escalar.
+                if ($exprType === 'array' && $this->func && $this->func->hasArray($name)) {
+                    $this->comment("$name := array literal (array registrado en prescan)");
+                    $this->pendingArrayInitName = $name;
+                    $this->visit($exprNodes[$i]);
+                    $this->addSymbol($name, 'array', $this->func->name, null, $line, $col);
+                    continue;
+                }
+
                 $offset = $this->allocVar($name, $exprType, $line, $col);
                 if ($offset !== null) {
                     $this->storeInferredResult($exprType, $offset);

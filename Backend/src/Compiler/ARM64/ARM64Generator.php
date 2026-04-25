@@ -229,6 +229,10 @@ class ARM64Generator extends \GolampiBaseVisitor
     // Se resetea a null después de usarse en addSymbol()
     protected ?array $lastLiteralValue = null;
 
+    // ── Rastreo de arrays usados en expresiones / inicializaciones ─────────
+    protected ?string $lastArrayName = null;
+    protected ?string $pendingArrayInitName = null;
+
     // ── Funciones de usuario registradas (hoisting) ───────────────────────
     protected array $userFunctions = [];
 

@@ -122,7 +122,7 @@ trait ArrayAssignment
         // ── Calcular dirección final ───────────────────────────────────────
         $baseOffset = $arrayInfo['base_offset'];
         $this->emit("sub x2, x29, #$baseOffset", "dirección base del array $name → x2");
-        $this->emit('add x3, x2, x1', "x3 = base + offset_dinámico");
+        $this->emit('sub x3, x2, x1', "x3 = base - offset_dinámico");
 
         // ── Guardar el valor ───────────────────────────────────────────────
         // x0 contiene el valor de la expresión

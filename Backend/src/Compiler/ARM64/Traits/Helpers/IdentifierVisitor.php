@@ -30,7 +30,22 @@ trait IdentifierVisitor
         $line = $ctx->getStart()->getLine();
         $col  = $ctx->getStart()->getCharPositionInLine();
 
-        if (!$this->func || !$this->func->hasLocal($name)) {
+        if (!$this->func) {
+            $this->addError('Semántico', "Variable '$name' no declarada", $line, $col);
+            $this->emit('mov x0, xzr', "? ($name no declarada)");
+            return 'int32';
+        }
+
+        // Identificador de array (ej: len(arr)): devolver dirección base y tipo 'array'.
+        if ($this->func->hasArray($name)) {
+            $arrayInfo = $this->func->getArrayInfo($name);
+            $baseOffset = $arrayInfo['base_offset'] ?? 0;
+            $this->emit("sub x0, x29, #$baseOffset", "$name (array base address)");
+            $this->lastArrayName = $name;
+            return 'array';
+        }
+
+        if (!$this->func->hasLocal($name)) {
             $this->addError('Semántico', "Variable '$name' no declarada", $line, $col);
             $this->emit('mov x0, xzr', "? ($name no declarada)");
             return 'int32';

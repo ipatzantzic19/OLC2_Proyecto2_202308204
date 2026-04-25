@@ -336,18 +336,100 @@ trait PrescanPhase
             return;
         }
 
-        // ✅ CORRECCIÓN: Usar i += 2 para saltear los separadores ',' (TerminalNodes)
-        // idList: ID ',' ID ',' ID → hijos en índices 0, 1, 2, 3, 4
-        // Queremos los IDs en índices pares: 0, 2, 4
-        $count = $idList->getChildCount();
-        for ($i = 0; $i < $count; $i += 2) {
+        // Recolectar identificadores
+        $ids = [];
+        for ($i = 0; $i < $idList->getChildCount(); $i += 2) {
             $child = $idList->getChild($i);
             if (method_exists($child, 'getText')) {
-                $name = $child->getText();
-                // Registrar con tipo 'unknown' (será inferido en visitShortVarDecl)
+                $ids[] = $child->getText();
+            }
+        }
+
+        // Recolectar expresiones (saltando comas)
+        $exprNodes = [];
+        for ($i = 0; $i < $exprList->getChildCount(); $i += 2) {
+            $exprNodes[] = $exprList->getChild($i);
+        }
+
+        // Registrar cada id. Si rhs es literal de arreglo fijo, registrar como array.
+        foreach ($ids as $idx => $name) {
+            $exprNode = $exprNodes[$idx] ?? null;
+            $arrayInfo = ($exprNode !== null) ? $this->extractArrayInfoFromShortDeclExpr($exprNode) : null;
+
+            if ($arrayInfo !== null) {
+                if (!$this->func->hasArray($name) && !$this->func->hasLocal($name)) {
+                    $this->func->allocArray($name, $arrayInfo['dims'], $arrayInfo['elemType']);
+                }
+                continue;
+            }
+
+            if (!$this->func->hasArray($name) && !$this->func->hasLocal($name)) {
+                // Escalar: tipo inferido luego en visitShortVarDecl
                 $this->func->allocLocal($name, 'unknown');
             }
         }
+    }
+
+    /**
+     * Detecta si una expresión de short var decl es un literal de arreglo fijo
+     * y extrae dimensiones + tipo de elemento.
+     */
+    private function extractArrayInfoFromShortDeclExpr($exprCtx): ?array
+    {
+        if ($exprCtx === null || !method_exists($exprCtx, 'getChildCount')) {
+            return null;
+        }
+
+        $queue = [$exprCtx];
+        $maxVisited = 1000;
+        $visited = 0;
+
+        while (!empty($queue) && $visited < $maxVisited) {
+            $node = array_shift($queue);
+            $visited++;
+
+            if (!is_object($node)) {
+                continue;
+            }
+
+            $class = get_class($node);
+            $base = substr($class, strrpos($class, '\\') + 1);
+
+            if ($base === 'FixedArrayLiteralNodeContext') {
+                $firstDimExpr = method_exists($node, 'expression') ? $node->expression() : null;
+                $typeCtx = method_exists($node, 'type') ? $node->type() : null;
+
+                if ($firstDimExpr === null || $typeCtx === null) {
+                    return null;
+                }
+
+                $firstDim = $this->evaluateLiteralExpressionFromPhase($firstDimExpr);
+                if ($firstDim === null || $firstDim <= 0) {
+                    return null;
+                }
+
+                $tailDims = $this->extractArrayDimensionsFromPhase($typeCtx);
+                $elemType = $this->extractArrayElementTypeFromPhase($typeCtx);
+
+                return [
+                    'dims' => array_merge([$firstDim], $tailDims),
+                    'elemType' => $elemType,
+                ];
+            }
+
+            if (method_exists($node, 'getChildCount')) {
+                $count = $node->getChildCount();
+                for ($i = 0; $i < $count; $i++) {
+                    $child = $node->getChild($i);
+                    if ($child instanceof \TerminalNode) {
+                        continue;
+                    }
+                    $queue[] = $child;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**

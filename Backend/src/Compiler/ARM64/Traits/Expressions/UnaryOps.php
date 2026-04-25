@@ -195,7 +195,7 @@ trait UnaryOps
         // ── Calcular dirección final ──────────────────────────────────────
         $baseOffset = $arrayInfo['base_offset'];
         $this->emit("sub x2, x29, #$baseOffset", "dirección base del array $name → x2");
-        $this->emit('add x3, x2, x1', "x3 = base + offset_dinámico");
+        $this->emit('sub x3, x2, x1', "x3 = base - offset_dinámico");
 
         // ── Cargar el valor ───────────────────────────────────────────────
         if ($elemType === 'float32') {
@@ -215,9 +215,274 @@ trait UnaryOps
      */
     public function visitArrayLiteralExpr($ctx)
     {
-        // Fase 3: generar múltiples str para inicialización
-        $this->emit('mov x0, xzr', 'array literal — pendiente implementación completa');
+        $literalInfo = $this->collectArrayLiteralValues($ctx->arrayLiteral());
+
+        if ($literalInfo === null) {
+            $this->emit('mov x0, xzr', 'array literal — sin información suficiente');
+            return 'array';
+        }
+
+        $this->lastArrayLiteral = $literalInfo;
+
+        if (!empty($this->pendingArrayInitName)) {
+            $this->initializeArrayLiteralInMemory($this->pendingArrayInitName, $ctx);
+            $this->pendingArrayInitName = null;
+        }
+
+        // El valor resultante de un literal de array es el array mismo.
+        $this->emit('mov x0, xzr', 'array literal → valor manejado por el destino');
         return 'array';
+    }
+
+    /**
+    * Devuelve información plana del literal de array.
+    * Estructura: ['values' => array<array{kind:string,value:mixed}>, 'dims' => int[]]
+     */
+    protected function collectArrayLiteralValues($arrayLiteralCtx): ?array
+    {
+        if ($arrayLiteralCtx === null) {
+            return null;
+        }
+
+        if (is_callable([$arrayLiteralCtx, 'arrayLiteral'])) {
+            try {
+                $nested = $arrayLiteralCtx->arrayLiteral();
+                if ($nested !== null) {
+                    $arrayLiteralCtx = $nested;
+                }
+            } catch (\Throwable $e) {}
+        }
+
+        $values = [];
+        $dims = [];
+
+        $appendScalarValues = function ($exprListCtx) use (&$values): void {
+            if ($exprListCtx === null || !method_exists($exprListCtx, 'getChildCount')) {
+                return;
+            }
+
+            for ($i = 0; $i < $exprListCtx->getChildCount(); $i += 2) {
+                $expr = $exprListCtx->getChild($i);
+                $value = $this->evaluateArrayLiteralScalar($expr);
+                if ($value !== null) {
+                    $values[] = $value;
+                }
+            }
+        };
+
+        $class = get_class($arrayLiteralCtx);
+        $base  = substr($class, strrpos($class, '\\') + 1);
+
+        if ($base === 'FixedArrayLiteralNodeContext') {
+            $firstDimExpr = $arrayLiteralCtx->expression();
+            $firstDim = $this->evaluateArrayLiteralScalar($firstDimExpr);
+            if ($firstDim === null || $firstDim <= 0) {
+                return null;
+            }
+
+            $dims[] = $firstDim;
+            $typeCtx = $arrayLiteralCtx->type();
+            if ($typeCtx !== null) {
+                $tailDims = $this->extractArrayDimsForLiteral($typeCtx);
+                $dims = array_merge($dims, $tailDims);
+            }
+
+            $exprList = $arrayLiteralCtx->expressionList();
+            $innerList = $arrayLiteralCtx->innerLiteralList();
+
+            if ($exprList !== null) {
+                $appendScalarValues($exprList);
+            } elseif ($innerList !== null) {
+                for ($i = 0; $i < $innerList->getChildCount(); $i++) {
+                    $child = $innerList->getChild($i);
+                    if ($child instanceof \Antlr\Antlr4\Runtime\ParserRuleContext) {
+                        if (method_exists($child, 'expressionList')) {
+                            $appendScalarValues($child->expressionList());
+                        }
+                    }
+                }
+            }
+
+            return ['values' => $values, 'dims' => $dims];
+        }
+
+        if ($base === 'SliceLiteralNodeContext') {
+            $exprList = $arrayLiteralCtx->expressionList();
+            if ($exprList !== null) {
+                $appendScalarValues($exprList);
+                $dims[] = count($values);
+                return ['values' => $values, 'dims' => $dims];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Evalúa un literal escalar de un literal de arreglo.
+     */
+    protected function evaluateArrayLiteralScalar($exprCtx)
+    {
+        if ($exprCtx === null) {
+            return null;
+        }
+
+        if ($exprCtx instanceof \Antlr\Antlr4\Runtime\TerminalNode) {
+            $text = $exprCtx->getText();
+            if (is_numeric($text)) {
+                return ['kind' => 'int32', 'value' => (int) $text];
+            }
+            if ($text === 'true') {
+                return ['kind' => 'bool', 'value' => 1];
+            }
+            if ($text === 'false') {
+                return ['kind' => 'bool', 'value' => 0];
+            }
+            if (strlen($text) >= 2 && $text[0] === '"' && substr($text, -1) === '"') {
+                return ['kind' => 'string', 'value' => stripcslashes(substr($text, 1, -1))];
+            }
+            if (strlen($text) >= 3 && $text[0] === '\'' && substr($text, -1) === '\'') {
+                return ['kind' => 'rune', 'value' => ord($text[1])];
+            }
+        }
+
+        if (method_exists($exprCtx, 'getChildCount')) {
+            for ($i = 0; $i < $exprCtx->getChildCount(); $i++) {
+                $child = $exprCtx->getChild($i);
+                $value = $this->evaluateArrayLiteralScalar($child);
+                if ($value !== null) {
+                    return $value;
+                }
+            }
+        }
+
+        $class = get_class($exprCtx);
+        $base  = substr($class, strrpos($class, '\\') + 1);
+
+        if ($base === 'IntLiteralContext') {
+            $token = $exprCtx->INT32();
+            return $token ? ['kind' => 'int32', 'value' => (int) $token->getText()] : null;
+        }
+
+        if ($base === 'TrueLiteralContext') {
+            return ['kind' => 'bool', 'value' => 1];
+        }
+
+        if ($base === 'FalseLiteralContext') {
+            return ['kind' => 'bool', 'value' => 0];
+        }
+
+        if ($base === 'RuneLiteralContext') {
+            $text = $exprCtx->RUNE()->getText();
+            return strlen($text) >= 3 ? ['kind' => 'rune', 'value' => ord($text[1])] : null;
+        }
+
+        if ($base === 'FloatLiteralContext') {
+            return ['kind' => 'float32', 'value' => (float) $exprCtx->FLOAT32()->getText()];
+        }
+
+        if ($base === 'StringLiteralContext') {
+            $text = $exprCtx->STRING()->getText();
+            return ['kind' => 'string', 'value' => stripcslashes(substr($text, 1, -1))];
+        }
+
+        return null;
+    }
+
+    /**
+     * Extrae dimensiones desde un tipo anidado para un array literal.
+     */
+    private function extractArrayDimsForLiteral($typeCtx): array
+    {
+        $dims = [];
+        $current = $typeCtx;
+
+        while ($current !== null) {
+            $class = get_class($current);
+            $base = substr($class, strrpos($class, '\\') + 1);
+
+            if ($base !== 'ArrayTypeContext') {
+                break;
+            }
+
+            $expr = null;
+            if (is_callable([$current, 'expression'])) {
+                try {
+                    $expr = $current->expression();
+                } catch (\Throwable $e) {}
+            }
+
+            $dim = $this->evaluateArrayLiteralScalar($expr);
+            if ($dim === null || $dim <= 0) {
+                break;
+            }
+
+            $dims[] = $dim;
+
+            if (is_callable([$current, 'type'])) {
+                try {
+                    $current = $current->type();
+                } catch (\Throwable $e) {
+                    $current = null;
+                }
+            } else {
+                $current = null;
+            }
+        }
+
+        return $dims;
+    }
+
+    /**
+     * Inicializa un array ya registrado en memoria con un literal.
+     */
+    protected function initializeArrayLiteralInMemory(string $name, $arrayLiteralCtx): void
+    {
+        if (!$this->func || !$this->func->hasArray($name)) {
+            return;
+        }
+
+        if (is_callable([$arrayLiteralCtx, 'arrayLiteral'])) {
+            try {
+                $nested = $arrayLiteralCtx->arrayLiteral();
+                if ($nested !== null) {
+                    $arrayLiteralCtx = $nested;
+                }
+            } catch (\Throwable $e) {}
+        }
+
+        $info = $this->collectArrayLiteralValues($arrayLiteralCtx);
+        if ($info === null) {
+            return;
+        }
+
+        $arrayInfo = $this->func->getArrayInfo($name);
+        if ($arrayInfo === null) {
+            return;
+        }
+
+        $baseOffset = $arrayInfo['base_offset'];
+        $elemType = $arrayInfo['elem_type'] ?? 'int32';
+        $totalSlots = $arrayInfo['total_slots'] ?? count($info['values']);
+
+        $values = $info['values'];
+        for ($i = 0; $i < $totalSlots; $i++) {
+            $entry = $values[$i] ?? ['kind' => $elemType, 'value' => 0];
+            $offset = $baseOffset + ($i * 8);
+
+            if ($entry['kind'] === 'string') {
+                $label = $this->internString((string) $entry['value']);
+                $this->emit("adrp x0, $label");
+                $this->emit("add x0, x0, :lo12:$label");
+                $this->emit("str x0, [x29, #-$offset]", $name . "[$i] ← string literal");
+            } elseif ($entry['kind'] === 'float32') {
+                $this->emit('mov x0, xzr', $name . "[$i] ← float placeholder");
+                $this->emit("str x0, [x29, #-$offset]");
+            } else {
+                $this->emit('mov x0, #' . (int) $entry['value'], $name . "[$i] ← literal");
+                $this->emit("str x0, [x29, #-$offset]");
+            }
+        }
     }
 
     /**
