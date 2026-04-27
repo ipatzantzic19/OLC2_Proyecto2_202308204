@@ -52,6 +52,9 @@ class ExecutionHandler
     public function execute(string $code): array
     {
         $startTime = microtime(true);
+
+        // Compatibilidad sintáctica con casts tipo float32(x) en la gramática actual.
+        $code = $this->normalizeTypeCastCalls($code);
         
         try {
             // Parse del código
@@ -181,6 +184,20 @@ class ExecutionHandler
             'Unknown' => 'Desconocido',
             'unknown' => 'desconocido',
         ]);
+    }
+
+    /**
+     * Reescribe casts primitivos a pseudo-funciones parseables por la gramática.
+     */
+    private function normalizeTypeCastCalls(string $code): string
+    {
+        return preg_replace_callback(
+            '/\b(int32|float32|bool|rune|string)\s*\(/',
+            static function (array $m): string {
+                return '__cast_' . $m[1] . '(';
+            },
+            $code
+        ) ?? $code;
     }
     
     private function formatSymbols(array $symbols): array

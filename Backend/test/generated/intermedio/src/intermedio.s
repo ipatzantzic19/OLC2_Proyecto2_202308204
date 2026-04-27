@@ -95,6 +95,8 @@ _start:
 	# int32 literal (64-bit per AArch64)
 	cmp x1, x0
 	# comparar x1(lhs) vs x0(rhs) - flags setup
+	cset x0, gt
+	# materializar resultado bool en x0
 	b.le .if_end_0
 	# branch falso (comparación simple)
 	# string literal → x0 (puntero)
@@ -149,6 +151,8 @@ _start:
 	# int32 literal (64-bit per AArch64)
 	cmp x1, x0
 	# comparar x1(lhs) vs x0(rhs) - flags setup
+	cset x0, ge
+	# materializar resultado bool en x0
 	b.lt .else_branch_2
 	# branch falso (comparación simple)
 	# string literal → x0 (puntero)
@@ -175,6 +179,8 @@ _start:
 	# int32 literal (64-bit per AArch64)
 	cmp x1, x0
 	# comparar x1(lhs) vs x0(rhs) - flags setup
+	cset x0, ge
+	# materializar resultado bool en x0
 	b.lt .else_branch_4
 	# branch falso (comparación simple)
 	# string literal → x0 (puntero)
@@ -346,6 +352,8 @@ _start:
 	# int32 literal (64-bit per AArch64)
 	cmp x1, x0
 	# comparar x1(lhs) vs x0(rhs) - flags setup
+	cset x0, le
+	# materializar resultado bool en x0
 	b.gt .for_end_11
 	# falso salir del bucle (comparación simple)
 	# string literal → x0 (puntero)
@@ -406,6 +414,8 @@ _start:
 	# int32 literal 0 (64-bit per AArch64)
 	cmp x1, x0
 	# comparar x1(lhs) vs x0(rhs) - flags setup
+	cset x0, gt
+	# materializar resultado bool en x0
 	b.le .while_end_14
 	# falso salir (comparación simple)
 	# string literal → x0 (puntero)
@@ -501,6 +511,8 @@ _start:
 	# int32 literal (64-bit per AArch64)
 	cmp x1, x0
 	# comparar x1(lhs) vs x0(rhs) - flags setup
+	cset x0, eq
+	# materializar resultado bool en x0
 	b.ne .if_end_17
 	# branch falso (comparación simple)
 	b .inf_end_16
@@ -538,6 +550,8 @@ _start:
 	# int32 literal (64-bit per AArch64)
 	cmp x1, x0
 	# comparar x1(lhs) vs x0(rhs) - flags setup
+	cset x0, le
+	# materializar resultado bool en x0
 	b.gt .for_end_19
 	# falso salir del bucle (comparación simple)
 	# if condición #1
@@ -548,6 +562,8 @@ _start:
 	# int32 literal (64-bit per AArch64)
 	cmp x1, x0
 	# comparar x1(lhs) vs x0(rhs) - flags setup
+	cset x0, eq
+	# materializar resultado bool en x0
 	b.ne .if_end_21
 	# branch falso (comparación simple)
 	# string literal → x0 (puntero)
@@ -617,6 +633,8 @@ _start:
 	# int32 literal (64-bit per AArch64)
 	cmp x1, x0
 	# comparar x1(lhs) vs x0(rhs) - flags setup
+	cset x0, le
+	# materializar resultado bool en x0
 	b.gt .for_end_23
 	# falso salir del bucle (comparación simple)
 	# if condición #1
@@ -640,6 +658,8 @@ _start:
 	# int32 literal 0 (64-bit per AArch64)
 	cmp x1, x0
 	# comparar x1(lhs) vs x0(rhs) - flags setup
+	cset x0, eq
+	# materializar resultado bool en x0
 	b.ne .if_end_25
 	# branch falso (comparación simple)
 	b .for_post_24
@@ -691,6 +711,7 @@ _start:
 	adrp x0, .str_2
 	add x0, x0, :lo12:.str_2
 	bl printf
+.epilogue__start:
 	add sp, sp, #64
 	# restaurar stack pointer
 	ldp x29, x30, [sp], #16

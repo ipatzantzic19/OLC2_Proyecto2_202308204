@@ -61,6 +61,18 @@ trait Comparisons
         $lhsType = $this->visit($ctx->relational(0));
         $op      = $ctx->getChild(1)->getText();
 
+        if ($lhsType === 'nil') {
+            $this->visit($ctx->relational(1));
+            $this->emit('mov x0, xzr', 'nil comparison → nil');
+            $this->lastComparison = [
+                'isSimple' => false,
+                'op' => $op,
+                'lhsReg' => '',
+                'rhsReg' => ''
+            ];
+            return 'nil';
+        }
+
         $this->generateComparison($lhsType, $op, function() use ($ctx) {
             return $this->visit($ctx->relational(1));
         });
@@ -78,6 +90,18 @@ trait Comparisons
 
         $lhsType = $this->visit($ctx->additive(0));
         $op      = $ctx->getChild(1)->getText();
+
+        if ($lhsType === 'nil') {
+            $this->visit($ctx->additive(1));
+            $this->emit('mov x0, xzr', 'nil comparison → nil');
+            $this->lastComparison = [
+                'isSimple' => false,
+                'op' => $op,
+                'lhsReg' => '',
+                'rhsReg' => ''
+            ];
+            return 'nil';
+        }
 
         $this->generateComparison($lhsType, $op, function() use ($ctx) {
             return $this->visit($ctx->additive(1));
@@ -126,6 +150,9 @@ trait Comparisons
 
         // ✅ cmp setup los flags sin generar cset
         $this->emit('cmp x1, x0', 'comparar x1(lhs) vs x0(rhs) - flags setup');
+
+        $cond = $this->resolveIntCondition($op);
+        $this->emit("cset x0, $cond", 'materializar resultado bool en x0');
         
         // ✅ Marcar comparación simple para que IF/ControlFlow use branch directo
         $this->lastComparison = [

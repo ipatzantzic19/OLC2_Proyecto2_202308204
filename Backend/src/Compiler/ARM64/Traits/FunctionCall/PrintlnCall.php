@@ -11,7 +11,7 @@ namespace Golampi\Compiler\ARM64\Traits\FunctionCall;
  * Implementación mediante printf de libc:
  *   fmt.Println(x)          → printf("%d\n", x)     para int32
  *   fmt.Println(x)          → printf("%g\n", d0)    para float32 (%g evita ceros innecesarios)
- *   fmt.Println(x)          → printf("%c\n", x)     para rune
+ *   fmt.Println(x)          → printf("%ld\n", x)    para rune (valor numérico)
  *   fmt.Println(x)          → printf("%s\n", x)     para string
  *   fmt.Println(x)          → printf("true\n") o printf("false\n") para bool
  *   fmt.Println(a, b, c)    → imprime cada valor con separador ' ' entre ellos
@@ -79,6 +79,7 @@ trait PrintlnCall
             'float32' => $this->printFloat($suffix),
             'rune'    => $this->printRune($suffix),
             'bool'    => $this->printBool($suffix),
+            'nil'     => $this->printNil($suffix),
             default   => $this->printString($suffix),
         };
     }
@@ -106,8 +107,8 @@ trait PrintlnCall
 
     private function printRune(string $suffix): void
     {
-        $fmt = $this->internString('%c' . $suffix);
-        $this->emit('mov x1, x0',             'rune → x1 para printf %c');
+        $fmt = $this->internString('%ld' . $suffix);
+        $this->emit('mov x1, x0',             'rune → x1 para printf %ld');
         $this->emit("adrp x0, $fmt");
         $this->emit("add x0, x0, :lo12:$fmt");
         $this->emit('bl printf');
@@ -151,6 +152,14 @@ trait PrintlnCall
         $this->emit('mov x1, x0',             'ptr string → x1');
         $this->emit("adrp x0, $fmt");
         $this->emit("add x0, x0, :lo12:$fmt");
+        $this->emit('bl printf');
+    }
+
+    private function printNil(string $suffix): void
+    {
+        $nilStr = $this->internString('<nil>' . $suffix);
+        $this->emit("adrp x0, $nilStr");
+        $this->emit("add x0, x0, :lo12:$nilStr");
         $this->emit('bl printf');
     }
 

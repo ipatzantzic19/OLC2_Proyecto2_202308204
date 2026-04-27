@@ -45,6 +45,10 @@ class CompilationHandler
     {
         $startTime = microtime(true);
 
+        // Compatibilidad sintáctica: permite casts tipo float32(x) aunque el parser
+        // actual no acepte tokens de tipo como nombre de función.
+        $code = $this->normalizeTypeCastCalls($code);
+
         if (trim($code) === '') {
             return [
                 'success'      => false,
@@ -163,5 +167,19 @@ class CompilationHandler
                 'symbolCount'  => 0,
             ];
         }
+    }
+
+    /**
+     * Reescribe casts primitivos a pseudo-funciones parseables por la gramática.
+     */
+    private function normalizeTypeCastCalls(string $code): string
+    {
+        return preg_replace_callback(
+            '/\b(int32|float32|bool|rune|string)\s*\(/',
+            static function (array $m): string {
+                return '__cast_' . $m[1] . '(';
+            },
+            $code
+        ) ?? $code;
     }
 }

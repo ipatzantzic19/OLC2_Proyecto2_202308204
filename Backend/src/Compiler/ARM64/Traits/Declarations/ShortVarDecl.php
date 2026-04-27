@@ -94,9 +94,14 @@ trait ShortVarDecl
                 // Si el id ya fue registrado como array en prescan (ej: a := [5]int32{...}),
                 // no intentar alocarlo como escalar.
                 if ($exprType === 'array' && $this->func && $this->func->hasArray($name)) {
-                    $this->comment("$name := array literal (array registrado en prescan)");
-                    $this->pendingArrayInitName = $name;
-                    $this->visit($exprNodes[$i]);
+                    if ($this->isFixedArrayLiteralExpr($exprNodes[$i])) {
+                        $this->comment("$name := array literal (array registrado en prescan)");
+                        $this->pendingArrayInitName = $name;
+                        $this->visit($exprNodes[$i]);
+                    } else {
+                        $this->comment("$name := retorno array (copiar desde puntero)");
+                        $this->copyArrayFromPointerResult($name);
+                    }
                     $this->addSymbol($name, 'array', $this->func->name, null, $line, $col);
                     continue;
                 }
@@ -233,6 +238,84 @@ trait ShortVarDecl
         } else {
             // Puntero, string, array → x0 (64-bit)
             $this->emit("str x0, [x29, #-$offset]", "guardar $type inferido (64-bit)");
+        }
+    }
+
+    private function isFixedArrayLiteralExpr($exprCtx): bool
+    {
+        if ($exprCtx === null || !method_exists($exprCtx, 'getChildCount')) {
+            return false;
+        }
+
+        $queue = [$exprCtx];
+        $visited = 0;
+
+        while (!empty($queue) && $visited < 1000) {
+            $node = array_shift($queue);
+            $visited++;
+
+            if (!is_object($node)) {
+                continue;
+            }
+
+            $class = get_class($node);
+            $base = substr($class, strrpos($class, '\\') + 1);
+            if ($base === 'FixedArrayLiteralNodeContext') {
+                return true;
+            }
+
+            if (method_exists($node, 'getChildCount')) {
+                $count = $node->getChildCount();
+                for ($i = 0; $i < $count; $i++) {
+                    $child = $node->getChild($i);
+                    if ($child instanceof \TerminalNode) {
+                        continue;
+                    }
+                    $queue[] = $child;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private function copyArrayFromPointerResult(string $targetName): void
+    {
+        if (!$this->func || !$this->func->hasArray($targetName)) {
+            return;
+        }
+
+        $info = $this->func->getArrayInfo($targetName);
+        if ($info === null) {
+            return;
+        }
+
+        $baseOffset = $info['base_offset'] ?? 0;
+        $totalSlots = $info['total_slots'] ?? 0;
+        if ($baseOffset <= 0 || $totalSlots <= 0) {
+            return;
+        }
+
+        // x0 contiene el puntero retornado por la función llamada.
+        $this->emit('mov x11, x0', "$targetName ptr retorno");
+
+        for ($i = 0; $i < $totalSlots; $i++) {
+            $srcOff = $i * 8;
+            $dstOff = $baseOffset + $srcOff;
+
+            if ($srcOff === 0) {
+                $this->emit('mov x14, x11', "{$targetName}[$i] base retorno");
+            } else {
+                $this->emit("sub x14, x11, #$srcOff", "{$targetName}[$i] dirección retorno");
+            }
+            $this->emit('ldr x12, [x14]', "{$targetName}[$i] leer retorno");
+
+            if ($dstOff >= 0 && $dstOff <= 255) {
+                $this->emit("str x12, [x29, #-$dstOff]", "{$targetName}[$i] guardar");
+            } else {
+                $this->emit("sub x13, x29, #$dstOff", "{$targetName}[$i] dirección destino");
+                $this->emit('str x12, [x13]', "{$targetName}[$i] guardar");
+            }
         }
     }
 }

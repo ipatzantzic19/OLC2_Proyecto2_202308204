@@ -47,121 +47,6 @@ require_once __DIR__ . '/Traits/RegisterAllocation/InterferenceGraph.php';
 require_once __DIR__ . '/Traits/RegisterAllocation/GraphColoring.php';
 require_once __DIR__ . '/Traits/RegisterAllocation/RegisterAllocator.php';
 
-/**
- * ARM64Generator — Generador de código ensamblador ARM64 (AArch64)
- *
- * Clase principal del backend del compilador Golampi.
- * Extiende GolampiBaseVisitor e implementa el patrón Visitor sobre el
- * árbol sintáctico generado por ANTLR4.
- *
- * ═══════════════════════════════════════════════════════════════════════════
- *  ARQUITECTURA DE TRAITS (organización modular)
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Todos los traits están organizados como orquestadores con sub-traits:
- *
- *   EmitterHandler ← orquesta:
- *     Emitter/InstructionEmitter  → emit(), label(), comment(), newLabel(), pushStack(), emitBinaryOp()
- *     Emitter/AssemblyBuilder     → buildAssembly()
- *
- *   StringPoolHandler ← orquesta:
- *     StringPool/PoolTrait        → internString(), asmEscape()
- *
- *   FloatHandler ← orquesta:
- *     FloatOps/FloatArithmetic    → fadd, fsub, fmul, fdiv con promoción de tipos
- *     FloatOps/FloatComparison    → comparaciones de floats (== != > >= < <=)
- *     FloatOps/FloatPool          → internFloat() para literales float
- *
- *   LiteralsHandler ← orquesta:
- *     Literals/IntLiteral         → visitIntLiteral()
- *     Literals/FloatLiteral       → visitFloatLiteral()
- *     Literals/RuneLiteral        → visitRune()
- *     Literals/StringLiteral      → visitStringLiteral()
- *     Literals/ScalarLiteral      → visitScalarLiteral()
- *
- *   AssignmentsHandler ← orquesta:
- *     Assignments/SimpleAssignment       → asignaciones simples (x = expr)
- *     Assignments/ArrayAssignment        → asignaciones a arrays (a[i] = expr)
- *     Assignments/PointerAssignment      → asignaciones a punteros (*p = expr)
- *     Assignments/IncrementDecrement     → ++, -- (pre y post)
- *
- *   StringOpsHandler ← orquesta:
- *     StringOps/ConcatHelper      → emitStringConcat() + golampi_concat helper
- *     StringOps/StringLenHelper   → emitStrlen()
- *     StringOps/SubstrHelper      → emitSubstr() + golampi_substr helper
- *     StringOps/NowHelper         → emitNow() + golampi_now helper
- *     StringOps/TypeOfHelper      → emitTypeOf()
- *
- *   FunctionCallHandler ← orquesta:
- *     FunctionCall/PrintlnCall    → fmt.Println()
- *     FunctionCall/BuiltinCall    → funciones built-in (len, append, etc.)
- *     FunctionCall/UserFunctionCall → llamadas a funciones usuario (con multi-retorno)
- *
- *   HelpersHandler ← orquesta:
- *     Helpers/SymbolManager       → allocVar(), addSymbol(), visitIdentifier()
- *     Helpers/TypeResolver        → getTypeName(), tipo de expresiones
- *     Helpers/FrameAllocator      → cálculo de frame size
- *     Helpers/IdentifierVisitor   → resolución de identificadores
- *
- *   ControlFlowHandler ← orquesta:
- *     ControlFlow/ForClassic      → for init ; cond ; post { }
- *     ControlFlow/ForWhile        → for cond { }
- *     ControlFlow/ForInfinite     → for { }
- *     ControlFlow/Condition       → if / else if / else
- *     ControlFlow/SwitchCase      → switch / case / default
- *     ControlFlow/Transfer        → break / continue / return
- *
- *   DeclHandler ← orquesta:
- *     Declarations/Prescan        → pasada 1: registrar variables
- *     Declarations/VarDecl        → var x T  /  var x T = expr
- *     Declarations/ShortVarDecl   → x := expr (tipo inferido)
- *     Declarations/ConstDecl      → const x T = expr
- *
- *   ExpressionsHandler ← orquesta:
- *     Expressions/ExpressionEntry → visitExpression (punto de entrada)
- *     Expressions/LogicalOps      → ||, && con cortocircuito
- *     Expressions/Comparisons     → ==, !=, >, >=, <, <=
- *     Expressions/ArithmeticOps   → +, -, *, /, % con promoción tipos
- *     Expressions/UnaryOps        → -, !, &, *, (expr), array access
- *
- * ═══════════════════════════════════════════════════════════════════════════
- *  REGISTRO DE ACTIVACIÓN (stack frame por función)
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * Conforme a Aho, Lam, Sethi — "Compiladores: Principios, Técnicas y Herramientas"
- * y a la convención de llamadas AArch64 (AAPCS64):
- *
- *   [dirección alta]
- *   ┌───────────────────────┐ ← sp_original (antes del stp)
- *   │  x29 (FP guardado)    │ ← [fp + 0]   → enlace de control
- *   │  x30 (LR guardado)    │ ← [fp + 8]   → dirección de retorno
- *   ├───────────────────────┤ ← x29 = fp (frame pointer)
- *   │  param 0 / local 0   │ ← [fp - 8]
- *   │  param 1 / local 1   │ ← [fp - 16]
- *   │        ...            │
- *   │  último local / array │ ← [fp - N]
- *   └───────────────────────┘ ← sp (fp - FRAME_SIZE)
- *   [dirección baja]
- *
- * Convención de registros:
- *   x0–x7   → argumentos enteros / punteros / valor de retorno
- *   s0–s7   → argumentos float32 / valor de retorno float
- *   x19     → callee-saved temporal para switch (valor de la expresión)
- *   x29     → frame pointer (fp)
- *   x30     → link register (lr / dirección de retorno)
- *   sp      → stack pointer
- *
- * ═══════════════════════════════════════════════════════════════════════════
- *  PROCESO DE COMPILACIÓN (dos pasadas por función)
- * ═══════════════════════════════════════════════════════════════════════════
- *
- *   Pasada 1 — Prescan (PrescanTrait):
- *     Recorre el AST del bloque y registra todas las variables en
- *     FunctionContext para calcular FRAME_SIZE antes de generar código.
- *
- *   Pasada 2 — Generación (todos los demás traits):
- *     Genera las instrucciones ARM64 recorriendo el AST con el Visitor.
- */
 class ARM64Generator extends \GolampiBaseVisitor
 {
     // ── Traits de infraestructura ─────────────────────────────────────────
@@ -232,6 +117,7 @@ class ARM64Generator extends \GolampiBaseVisitor
     // ── Rastreo de arrays usados en expresiones / inicializaciones ─────────
     protected ?string $lastArrayName = null;
     protected ?string $pendingArrayInitName = null;
+    protected array $arrayParamBindings = [];
 
     // ── Funciones de usuario registradas (hoisting) ───────────────────────
     protected array $userFunctions = [];

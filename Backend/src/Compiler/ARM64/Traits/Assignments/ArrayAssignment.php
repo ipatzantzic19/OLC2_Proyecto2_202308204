@@ -125,9 +125,19 @@ trait ArrayAssignment
         $this->emit('sub x3, x2, x1', "x3 = base - offset_dinámico");
 
         // ── Guardar el valor ───────────────────────────────────────────────
-        // x0 contiene el valor de la expresión
-        // x3 contiene la dirección del elemento
-        $this->emit('str x0, [x3]', "$name" . $this->indicesAsString($indices) . " ← valor");
+        // x0/s0 contiene el valor de la expresión según tipo.
+        // x3 contiene la dirección del elemento.
+        if ($elemType === 'float32') {
+            if ($valueType !== 'float32') {
+                $this->emitIntToFloat();
+            }
+            $this->emit('str s0, [x3]', "$name" . $this->indicesAsString($indices) . " ← valor float32");
+        } else {
+            if ($valueType === 'float32') {
+                $this->emitFloatToInt();
+            }
+            $this->emit('str x0, [x3]', "$name" . $this->indicesAsString($indices) . " ← valor");
+        }
 
         return $elemType;
     }
@@ -159,7 +169,7 @@ trait ArrayAssignment
         
         $this->emit('mov x1, xzr', 'x1 = offset acumulador');
 
-        for ($i = 0; $i < $numIndices; $i++) {
+        for ($i = $numIndices - 1; $i >= 0; $i--) {
             $this->emit('ldr x4, [sp]', "índice $i ← stack");
             $this->emit('add sp, sp, #16');
 

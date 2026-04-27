@@ -126,6 +126,21 @@ trait FunctionCallHandler
 
             case 'typeOf':
                 return $this->generateTypeOf($ctx->argumentList());
+
+            case '__cast_float32':
+                return $this->generateTypeCastCall($ctx->argumentList(), 'float32');
+
+            case '__cast_int32':
+                return $this->generateTypeCastCall($ctx->argumentList(), 'int32');
+
+            case '__cast_bool':
+                return $this->generateTypeCastCall($ctx->argumentList(), 'bool');
+
+            case '__cast_rune':
+                return $this->generateTypeCastCall($ctx->argumentList(), 'rune');
+
+            case '__cast_string':
+                return $this->generateTypeCastCall($ctx->argumentList(), 'string');
         }
 
         // ── 3. Funciones de usuario (declaradas con func en Golampi) ──────────
@@ -143,5 +158,53 @@ trait FunctionCallHandler
         );
         $this->emit('mov x0, xzr', "función '$name' no encontrada → nil");
         return 'nil';
+    }
+
+    /**
+     * Cast explícito de un argumento a tipo destino.
+     */
+    private function generateTypeCastCall($argListCtx, string $targetType): string
+    {
+        $args = [];
+        if ($argListCtx !== null) {
+            for ($i = 0; $i < $argListCtx->getChildCount(); $i += 2) {
+                $args[] = $argListCtx->getChild($i);
+            }
+        }
+
+        if (count($args) !== 1) {
+            $this->emit('mov x0, xzr', "cast $targetType inválido");
+            return $targetType;
+        }
+
+        $sourceType = $this->visit($args[0]) ?? 'int32';
+
+        if ($targetType === 'float32') {
+            if ($sourceType !== 'float32') {
+                $this->emitIntToFloat();
+            }
+            return 'float32';
+        }
+
+        if ($targetType === 'int32' || $targetType === 'rune') {
+            if ($sourceType === 'float32') {
+                $this->emitFloatToInt();
+            }
+            return $targetType;
+        }
+
+        if ($targetType === 'bool') {
+            if ($sourceType === 'float32') {
+                $this->emit('fcmp s0, #0.0', 'cast float32 -> bool (comparar con 0)');
+                $this->emit('cset x0, ne', 'true si distinto de 0.0');
+                return 'bool';
+            }
+            $this->emit('cmp x0, #0', 'cast int -> bool (comparar con 0)');
+            $this->emit('cset x0, ne', 'true si distinto de 0');
+            return 'bool';
+        }
+
+        // string: por ahora no transforma representación; asume argumento ya string.
+        return 'string';
     }
 }

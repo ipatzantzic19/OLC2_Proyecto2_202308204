@@ -356,6 +356,10 @@ trait PrescanPhase
             $exprNode = $exprNodes[$idx] ?? null;
             $arrayInfo = ($exprNode !== null) ? $this->extractArrayInfoFromShortDeclExpr($exprNode) : null;
 
+            if ($arrayInfo === null && $exprNode !== null) {
+                $arrayInfo = $this->extractArrayInfoFromFunctionCallExpr($exprNode);
+            }
+
             if ($arrayInfo !== null) {
                 if (!$this->func->hasArray($name) && !$this->func->hasLocal($name)) {
                     $this->func->allocArray($name, $arrayInfo['dims'], $arrayInfo['elemType']);
@@ -433,6 +437,102 @@ trait PrescanPhase
     }
 
     /**
+     * Detecta si la expresión es llamada a función cuyo retorno es array.
+     */
+    private function extractArrayInfoFromFunctionCallExpr($exprCtx): ?array
+    {
+        if ($exprCtx === null || !method_exists($exprCtx, 'getChildCount')) {
+            return null;
+        }
+
+        $queue = [$exprCtx];
+        $visited = 0;
+        $maxVisited = 1000;
+
+        while (!empty($queue) && $visited < $maxVisited) {
+            $node = array_shift($queue);
+            $visited++;
+
+            if (!is_object($node)) {
+                continue;
+            }
+
+            $class = get_class($node);
+            $base = substr($class, strrpos($class, '\\') + 1);
+
+            if ($base === 'FunctionCallContext') {
+                $funcName = $this->extractFunctionCallNameFromPhase($node);
+                if ($funcName !== null) {
+                    $returnTypeCtx = $this->resolveUserFunctionReturnTypeCtx($funcName);
+                    if ($returnTypeCtx !== null && $this->getTypeName($returnTypeCtx) === 'array') {
+                        $dims = $this->extractArrayDimensionsFromPhase($returnTypeCtx);
+                        $elemType = $this->extractArrayElementTypeFromPhase($returnTypeCtx);
+                        if (!empty($dims)) {
+                            return ['dims' => $dims, 'elemType' => $elemType];
+                        }
+                    }
+                }
+            }
+
+            $count = $node->getChildCount();
+            for ($i = 0; $i < $count; $i++) {
+                $child = $node->getChild($i);
+                if ($child instanceof \TerminalNode) {
+                    continue;
+                }
+                $queue[] = $child;
+            }
+        }
+
+        return null;
+    }
+
+    private function extractFunctionCallNameFromPhase($functionCallCtx): ?string
+    {
+        try {
+            $ids = $functionCallCtx->ID();
+            if (is_array($ids)) {
+                if (count($ids) >= 2) {
+                    return $ids[0]->getText() . '.' . $ids[1]->getText();
+                }
+                if (count($ids) === 1) {
+                    return $ids[0]->getText();
+                }
+                return null;
+            }
+            if ($ids !== null) {
+                return $ids->getText();
+            }
+        } catch (\Throwable $e) {}
+
+        return null;
+    }
+
+    private function resolveUserFunctionReturnTypeCtx(string $funcName)
+    {
+        if (!isset($this->userFunctions[$funcName])) {
+            return null;
+        }
+
+        $funcDecl = $this->userFunctions[$funcName];
+        if (is_array($funcDecl) && isset($funcDecl['ctx'])) {
+            $funcDecl = $funcDecl['ctx'];
+        }
+
+        if (!is_object($funcDecl)) {
+            return null;
+        }
+
+        try {
+            if (is_callable([$funcDecl, 'type'])) {
+                return $funcDecl->type();
+            }
+        } catch (\Throwable $e) {}
+
+        return null;
+    }
+
+    /**
      * Prescan de declaración const: const x T = expr
      * Similar a var pero inmutable.
      */
@@ -440,27 +540,48 @@ trait PrescanPhase
     {
         if (!isset($this->func)) return;
 
-        // Patrón: const name Type = expr
-        $identList = $constDeclCtx->identifierList();
-        $typeCtx   = $constDeclCtx->typeSpec();
+        // Gramática actual: const ID type? = expression
+        $names = [];
+        if (is_callable([$constDeclCtx, 'idList'])) {
+            $idList = $constDeclCtx->idList();
+            if ($idList && method_exists($idList, 'getChildCount')) {
+                $count = $idList->getChildCount();
+                for ($i = 0; $i < $count; $i++) {
+                    $child = $idList->getChild($i);
+                    if ($child instanceof \TerminalNode) {
+                        continue;
+                    }
+                    if (method_exists($child, 'getText')) {
+                        $names[] = $child->getText();
+                    }
+                }
+            }
+        }
 
-        if (!$identList || !$typeCtx) {
+        if (empty($names) && is_callable([$constDeclCtx, 'ID'])) {
+            $idNode = $constDeclCtx->ID();
+            if ($idNode && method_exists($idNode, 'getText')) {
+                $names[] = $idNode->getText();
+            }
+        }
+
+        if (empty($names)) {
             return;
         }
 
-        $type = $this->getTypeName($typeCtx);
+        $typeCtx = null;
+        if (is_callable([$constDeclCtx, 'type'])) {
+            $typeCtx = $constDeclCtx->type();
+        } elseif (is_callable([$constDeclCtx, 'typeSpec'])) {
+            // Compatibilidad con variantes anteriores del parser.
+            $typeCtx = $constDeclCtx->typeSpec();
+        }
 
-        $count = $identList->getChildCount();
-        for ($i = 0; $i < $count; $i++) {
-            $child = $identList->getChild($i);
-            if ($child instanceof \TerminalNode) {
-                continue;
-            }
-            if (method_exists($child, 'getText')) {
-                $name = $child->getText();
-                // Registrar como const (mismo storage que var, la diferencia es semántica)
-                $this->func->allocLocal($name, $type);
-            }
+        $type = $typeCtx ? $this->getTypeName($typeCtx) : 'int32';
+
+        foreach ($names as $name) {
+            // Registrar como const (mismo storage que var, la diferencia es semántica)
+            $this->func->allocLocal($name, $type);
         }
     }
 

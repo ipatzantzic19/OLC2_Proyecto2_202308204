@@ -256,17 +256,61 @@ trait UnaryOps
         $values = [];
         $dims = [];
 
-        $appendScalarValues = function ($exprListCtx) use (&$values): void {
-            if ($exprListCtx === null || !method_exists($exprListCtx, 'getChildCount')) {
+        $appendScalarValues = function ($node) use (&$values, &$appendScalarValues): void {
+            if ($node === null) {
                 return;
             }
 
-            for ($i = 0; $i < $exprListCtx->getChildCount(); $i += 2) {
-                $expr = $exprListCtx->getChild($i);
-                $value = $this->evaluateArrayLiteralScalar($expr);
-                if ($value !== null) {
-                    $values[] = $value;
+            $scalar = $this->evaluateArrayLiteralScalar($node);
+            if ($scalar !== null) {
+                $values[] = $scalar;
+                return;
+            }
+
+            if (is_object($node)) {
+                $class = get_class($node);
+                $base = substr($class, strrpos($class, '\\') + 1);
+
+                if ($base === 'FixedArrayLiteralNodeContext' || $base === 'SliceLiteralNodeContext') {
+                    $exprList = method_exists($node, 'expressionList') ? $node->expressionList() : null;
+                    $innerList = method_exists($node, 'innerLiteralList') ? $node->innerLiteralList() : null;
+
+                    if ($exprList !== null) {
+                        $appendScalarValues($exprList);
+                        return;
+                    }
+
+                    if ($innerList !== null && method_exists($innerList, 'getChildCount')) {
+                        for ($i = 0; $i < $innerList->getChildCount(); $i++) {
+                            $child = $innerList->getChild($i);
+                            if ($child instanceof \Antlr\Antlr4\Runtime\TerminalNode) {
+                                continue;
+                            }
+                            $appendScalarValues($child);
+                        }
+                        return;
+                    }
                 }
+
+                if ($base === 'InnerLiteralContext') {
+                    $exprList = method_exists($node, 'expressionList') ? $node->expressionList() : null;
+                    if ($exprList !== null) {
+                        $appendScalarValues($exprList);
+                    }
+                    return;
+                }
+            }
+
+            if (is_object($node) && method_exists($node, 'getChildCount')) {
+                $count = $node->getChildCount();
+                for ($i = 0; $i < $count; $i++) {
+                    $child = $node->getChild($i);
+                    if ($child instanceof \Antlr\Antlr4\Runtime\TerminalNode) {
+                        continue;
+                    }
+                    $appendScalarValues($child);
+                }
+                return;
             }
         };
 
@@ -275,8 +319,9 @@ trait UnaryOps
 
         if ($base === 'FixedArrayLiteralNodeContext') {
             $firstDimExpr = $arrayLiteralCtx->expression();
-            $firstDim = $this->evaluateArrayLiteralScalar($firstDimExpr);
-            if ($firstDim === null || $firstDim <= 0) {
+            $firstDimInfo = $this->evaluateArrayLiteralScalar($firstDimExpr);
+            $firstDim = is_array($firstDimInfo) ? (int) ($firstDimInfo['value'] ?? 0) : 0;
+            if ($firstDim <= 0) {
                 return null;
             }
 
@@ -293,14 +338,7 @@ trait UnaryOps
             if ($exprList !== null) {
                 $appendScalarValues($exprList);
             } elseif ($innerList !== null) {
-                for ($i = 0; $i < $innerList->getChildCount(); $i++) {
-                    $child = $innerList->getChild($i);
-                    if ($child instanceof \Antlr\Antlr4\Runtime\ParserRuleContext) {
-                        if (method_exists($child, 'expressionList')) {
-                            $appendScalarValues($child->expressionList());
-                        }
-                    }
-                }
+                $appendScalarValues($innerList);
             }
 
             return ['values' => $values, 'dims' => $dims];
@@ -346,12 +384,26 @@ trait UnaryOps
             }
         }
 
-        if (method_exists($exprCtx, 'getChildCount')) {
-            for ($i = 0; $i < $exprCtx->getChildCount(); $i++) {
-                $child = $exprCtx->getChild($i);
-                $value = $this->evaluateArrayLiteralScalar($child);
-                if ($value !== null) {
-                    return $value;
+        if (is_object($exprCtx) && method_exists($exprCtx, 'getText')) {
+            $text = trim((string) $exprCtx->getText());
+            if ($text !== '') {
+                if (preg_match('/^[0-9]+$/', $text)) {
+                    return ['kind' => 'int32', 'value' => (int) $text];
+                }
+                if (preg_match('/^[0-9]+\.[0-9]+$/', $text)) {
+                    return ['kind' => 'float32', 'value' => (float) $text];
+                }
+                if ($text === 'true') {
+                    return ['kind' => 'bool', 'value' => 1];
+                }
+                if ($text === 'false') {
+                    return ['kind' => 'bool', 'value' => 0];
+                }
+                if (strpos($text, ',') === false && strlen($text) >= 2 && $text[0] === '"' && substr($text, -1) === '"') {
+                    return ['kind' => 'string', 'value' => stripcslashes(substr($text, 1, -1))];
+                }
+                if (strpos($text, ',') === false && strlen($text) >= 3 && $text[0] === '\'' && substr($text, -1) === '\'') {
+                    return ['kind' => 'rune', 'value' => ord($text[1])];
                 }
             }
         }
@@ -412,8 +464,9 @@ trait UnaryOps
                 } catch (\Throwable $e) {}
             }
 
-            $dim = $this->evaluateArrayLiteralScalar($expr);
-            if ($dim === null || $dim <= 0) {
+            $dimInfo = $this->evaluateArrayLiteralScalar($expr);
+            $dim = is_array($dimInfo) ? (int) ($dimInfo['value'] ?? 0) : 0;
+            if ($dim <= 0) {
                 break;
             }
 
@@ -474,15 +527,42 @@ trait UnaryOps
                 $label = $this->internString((string) $entry['value']);
                 $this->emit("adrp x0, $label");
                 $this->emit("add x0, x0, :lo12:$label");
-                $this->emit("str x0, [x29, #-$offset]", $name . "[$i] ← string literal");
+                $this->emitStoreX0AtFrameOffset($offset, $name . "[$i] ← string literal");
             } elseif ($entry['kind'] === 'float32') {
-                $this->emit('mov x0, xzr', $name . "[$i] ← float placeholder");
-                $this->emit("str x0, [x29, #-$offset]");
+                $label = $this->internFloat((float) $entry['value']);
+                $this->emit("adrp x9, $label", $name . "[$i] float literal");
+                $this->emit("ldr s0, [x9, :lo12:$label]", $name . "[$i] cargar float32");
+                $this->emitStoreS0AtFrameOffset($offset);
             } else {
                 $this->emit('mov x0, #' . (int) $entry['value'], $name . "[$i] ← literal");
-                $this->emit("str x0, [x29, #-$offset]");
+                $this->emitStoreX0AtFrameOffset($offset);
             }
         }
+    }
+
+    /**
+     * Almacena x0 en [x29 - offset] manejando offsets grandes del frame.
+     */
+    private function emitStoreX0AtFrameOffset(int $offset, string $comment = ''): void
+    {
+        if ($offset >= 0 && $offset <= 255) {
+            $this->emit("str x0, [x29, #-$offset]", $comment);
+            return;
+        }
+
+        $this->emit("sub x10, x29, #$offset", 'direccion efectiva slot de frame');
+        $this->emit('str x0, [x10]', $comment);
+    }
+
+    private function emitStoreS0AtFrameOffset(int $offset, string $comment = ''): void
+    {
+        if ($offset >= 0 && $offset <= 255) {
+            $this->emit("str s0, [x29, #-$offset]", $comment);
+            return;
+        }
+
+        $this->emit("sub x10, x29, #$offset", 'direccion efectiva slot float de frame');
+        $this->emit('str s0, [x10]', $comment);
     }
 
     /**
@@ -519,7 +599,7 @@ trait UnaryOps
         // Multidimensional: row-major
         $this->emit('mov x1, xzr', 'x1 = offset acumulador');
 
-        for ($i = 0; $i < $numIndices; $i++) {
+        for ($i = $numIndices - 1; $i >= 0; $i--) {
             $this->emit('ldr x4, [sp]', "índice $i ← stack");
             $this->emit('add sp, sp, #16');
 

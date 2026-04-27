@@ -160,6 +160,52 @@ trait GenerationPhase
                 $paramRegister++;
             }
         }
+
+        // Copiar parámetros array desde puntero de entrada al frame local.
+        foreach ($this->arrayParamBindings as $binding) {
+            $name = $binding['name'] ?? null;
+            $regIndex = $binding['reg'] ?? 0;
+
+            if ($name === null || $regIndex < 0 || $regIndex >= 8) {
+                continue;
+            }
+            if (!$this->func->hasArray($name)) {
+                continue;
+            }
+
+            $arrayInfo = $this->func->getArrayInfo($name);
+            if ($arrayInfo === null) {
+                continue;
+            }
+
+            $baseOffset = $arrayInfo['base_offset'] ?? 0;
+            $totalSlots = $arrayInfo['total_slots'] ?? 0;
+            if ($baseOffset <= 0 || $totalSlots <= 0) {
+                continue;
+            }
+
+            $srcReg = 'x' . $regIndex;
+            $this->emit("mov x11, $srcReg", "param array $name: ptr de entrada");
+
+            for ($i = 0; $i < $totalSlots; $i++) {
+                $srcOff = $i * 8;
+                $dstOff = $baseOffset + $srcOff;
+
+                if ($srcOff === 0) {
+                    $this->emit('mov x14, x11', "{$name}[$i] base param");
+                } else {
+                    $this->emit("sub x14, x11, #$srcOff", "{$name}[$i] dirección param");
+                }
+                $this->emit('ldr x12, [x14]', "{$name}[$i] leer param");
+
+                if ($dstOff >= 0 && $dstOff <= 255) {
+                    $this->emit("str x12, [x29, #-$dstOff]", "{$name}[$i] copiar a frame");
+                } else {
+                    $this->emit("sub x13, x29, #$dstOff", "{$name}[$i] dirección destino");
+                    $this->emit('str x12, [x13]', "{$name}[$i] copiar a frame");
+                }
+            }
+        }
     }
 
     /**
@@ -227,6 +273,8 @@ trait GenerationPhase
         $oldFunc = $this->func;
         $this->func = $functionContext;
         $this->activeFrameSize = null;
+        $this->func->epilogueLabel = '.epilogue_' . $label;
+        $this->arrayParamBindings = [];
 
         // Prescan de parámetros (si la función los tiene)
         $this->phasePrescanFunctionParams($funcCtx);
@@ -251,6 +299,9 @@ trait GenerationPhase
         if ($blockCtx !== null) {
             $this->phaseGenerateBlock($blockCtx);
         }
+
+        // Punto único de salida para sentencias return.
+        $this->label($this->func->epilogueLabel);
 
         // Generar epílogo
         $this->phaseGenerateEpilogue();
@@ -279,6 +330,8 @@ trait GenerationPhase
         if ($params === null) {
             return;
         }
+
+        $paramIndex = 0;
 
         // Registrar cada parámetro
         for ($i = 0; $i < $params->getChildCount(); $i++) {
@@ -309,6 +362,7 @@ trait GenerationPhase
                 if ($paramName !== null) {
                     // Extraer tipo
                     $paramType = 'int32';
+                    $typeCtx = null;
                     if (method_exists($child, 'type')) {
                         try {
                             $typeCtx = $child->type();
@@ -318,11 +372,111 @@ trait GenerationPhase
                         } catch (\Throwable $e) {}
                     }
 
-                    // Registrar como variable local
-                    $this->func->allocLocal($paramName, $paramType);
+                    // Registrar parámetros array con metadata de dimensiones.
+                    if ($paramType === 'array' && isset($typeCtx) && $typeCtx !== null) {
+                        $dims = $this->extractArrayDimensionsFromParamType($typeCtx);
+                        $elemType = $this->extractArrayElementTypeFromParamType($typeCtx);
+                        if (!empty($dims)) {
+                            $this->func->allocArray($paramName, $dims, $elemType);
+                            $this->arrayParamBindings[] = [
+                                'name' => $paramName,
+                                'reg' => $paramIndex,
+                            ];
+                        } else {
+                            $this->func->allocLocal($paramName, $paramType);
+                        }
+                    } else {
+                        // Registrar como variable local
+                        $this->func->allocLocal($paramName, $paramType);
+                    }
+
+                    $paramIndex++;
                 }
             }
         }
+    }
+
+    private function extractArrayDimensionsFromParamType($typeCtx): array
+    {
+        $dims = [];
+        $current = $typeCtx;
+        $guard = 0;
+
+        while ($current !== null && $guard < 100) {
+            $guard++;
+            $class = get_class($current);
+            $base = substr($class, strrpos($class, '\\') + 1);
+            if ($base !== 'ArrayTypeContext') {
+                break;
+            }
+
+            $expr = null;
+            if (is_callable([$current, 'expression'])) {
+                try {
+                    $expr = $current->expression();
+                } catch (\Throwable $e) {}
+            }
+
+            $dim = $this->evaluateLiteralParamArrayDim($expr);
+            if ($dim === null || $dim <= 0) {
+                break;
+            }
+            $dims[] = $dim;
+
+            if (is_callable([$current, 'type'])) {
+                try {
+                    $current = $current->type();
+                } catch (\Throwable $e) {
+                    $current = null;
+                }
+            } else {
+                $current = null;
+            }
+        }
+
+        return $dims;
+    }
+
+    private function extractArrayElementTypeFromParamType($typeCtx): string
+    {
+        $current = $typeCtx;
+        $guard = 0;
+
+        while ($current !== null && $guard < 100) {
+            $guard++;
+            $class = get_class($current);
+            $base = substr($class, strrpos($class, '\\') + 1);
+
+            if ($base !== 'ArrayTypeContext') {
+                return $this->getTypeName($current);
+            }
+
+            if (is_callable([$current, 'type'])) {
+                try {
+                    $current = $current->type();
+                } catch (\Throwable $e) {
+                    $current = null;
+                }
+            } else {
+                $current = null;
+            }
+        }
+
+        return 'int32';
+    }
+
+    private function evaluateLiteralParamArrayDim($exprCtx): ?int
+    {
+        if ($exprCtx === null || !method_exists($exprCtx, 'getText')) {
+            return null;
+        }
+
+        $text = trim($exprCtx->getText());
+        if ($text !== '' && ctype_digit($text)) {
+            return (int) $text;
+        }
+
+        return null;
     }
 
     /**

@@ -93,6 +93,14 @@ trait UserFunctionCall
         if (!isset($this->userFunctions[$name])) return 'int32';
 
         $funcDecl = $this->userFunctions[$name];
+        if (is_array($funcDecl) && isset($funcDecl['ctx'])) {
+            $funcDecl = $funcDecl['ctx'];
+        }
+
+        if (!is_object($funcDecl)) {
+            return 'int32';
+        }
+
         try {
             if (is_callable([$funcDecl, 'type'])) {
                 $typeCtx = $funcDecl->type();

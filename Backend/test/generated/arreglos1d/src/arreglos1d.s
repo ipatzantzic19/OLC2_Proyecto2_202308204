@@ -14,13 +14,19 @@ len = . - buffer
 .str_6: .string "%ld"
 .str_7: .string "Inicializado pos2:"
 .str_8: .string "\n--- 5.2 ARREGLOS DE TIPOS ESTATICOS ---"
+.align 2
+.flt_0: .single 1.1
+.align 2
+.flt_1: .single 2.2
+.align 2
+.flt_2: .single 3.3
 .str_9: .string "Ana"
 .str_10: .string "Luis"
 .str_11: .string "Maria"
 .str_12: .string "%g "
 .str_13: .string "false"
 .str_14: .string "true"
-.str_15: .string "%c "
+.str_15: .string "%ld "
 .str_16: .string "\n--- 5.3 ACCESO Y MODIFICACION 1D ---"
 .str_17: .string "Original arregloInit[1]:"
 .str_18: .string "Modificado arregloInit[1]:"
@@ -194,15 +200,21 @@ _start:
 	mov x0, xzr
 	# array literal → valor manejado por el destino
 	# arrFloat := array literal (array registrado en prescan)
-	mov x0, xzr
-	# arrFloat[0] ← float placeholder
-	str x0, [x29, #-88]
-	mov x0, xzr
-	# arrFloat[1] ← float placeholder
-	str x0, [x29, #-96]
-	mov x0, xzr
-	# arrFloat[2] ← float placeholder
-	str x0, [x29, #-104]
+	adrp x9, .flt_0
+	# arrFloat[0] float literal
+	ldr s0, [x9, :lo12:.flt_0]
+	# arrFloat[0] cargar float32
+	str s0, [x29, #-88]
+	adrp x9, .flt_1
+	# arrFloat[1] float literal
+	ldr s0, [x9, :lo12:.flt_1]
+	# arrFloat[1] cargar float32
+	str s0, [x29, #-96]
+	adrp x9, .flt_2
+	# arrFloat[2] float literal
+	ldr s0, [x9, :lo12:.flt_2]
+	# arrFloat[2] cargar float32
+	str s0, [x29, #-104]
 	mov x0, xzr
 	# array literal → valor manejado por el destino
 	# arrBool := expr (tipo inferido)
@@ -337,7 +349,7 @@ _start:
 	# arrRune[idx] (lectura) → x0
 	# fmt.Println arg 2 (rune)
 	mov x1, x0
-	# rune → x1 para printf %c
+	# rune → x1 para printf %ld
 	adrp x0, .str_15
 	add x0, x0, :lo12:.str_15
 	bl printf
@@ -526,13 +538,13 @@ _start:
 	mov x0, #1
 	# matrizInit[0] ← literal
 	str x0, [x29, #-216]
-	mov x0, #3
+	mov x0, #2
 	# matrizInit[1] ← literal
 	str x0, [x29, #-224]
-	mov x0, #0
+	mov x0, #3
 	# matrizInit[2] ← literal
 	str x0, [x29, #-232]
-	mov x0, #0
+	mov x0, #4
 	# matrizInit[3] ← literal
 	str x0, [x29, #-240]
 	mov x0, xzr
@@ -562,6 +574,11 @@ _start:
 	mov x1, xzr
 	# x1 = offset acumulador
 	ldr x4, [sp]
+	# índice 1 ← stack
+	add sp, sp, #16
+	add x1, x1, x4
+	# offset += idx[1] * stride
+	ldr x4, [sp]
 	# índice 0 ← stack
 	add sp, sp, #16
 	mov x5, #2
@@ -570,11 +587,6 @@ _start:
 	# idx[0] * stride
 	add x1, x1, x4
 	# offset += idx[0] * stride
-	ldr x4, [sp]
-	# índice 1 ← stack
-	add sp, sp, #16
-	add x1, x1, x4
-	# offset += idx[1] * stride
 	lsl x1, x1, #3
 	# offset *= 8
 	sub x2, x29, #184
@@ -617,6 +629,11 @@ _start:
 	mov x1, xzr
 	# x1 = offset acumulador
 	ldr x4, [sp]
+	# índice 1 ← stack
+	add sp, sp, #16
+	add x1, x1, x4
+	# offset += idx[1] * stride
+	ldr x4, [sp]
 	# índice 0 ← stack
 	add sp, sp, #16
 	mov x5, #2
@@ -625,11 +642,6 @@ _start:
 	# idx[0] * stride
 	add x1, x1, x4
 	# offset += idx[0] * stride
-	ldr x4, [sp]
-	# índice 1 ← stack
-	add sp, sp, #16
-	add x1, x1, x4
-	# offset += idx[1] * stride
 	lsl x1, x1, #3
 	# offset *= 8
 	sub x2, x29, #216
@@ -684,6 +696,11 @@ _start:
 	mov x1, xzr
 	# x1 = offset acumulador
 	ldr x4, [sp]
+	# índice 1 ← stack
+	add sp, sp, #16
+	add x1, x1, x4
+	# offset += idx[1] * stride
+	ldr x4, [sp]
 	# índice 0 ← stack
 	add sp, sp, #16
 	mov x5, #2
@@ -692,11 +709,6 @@ _start:
 	# idx[0] * stride
 	add x1, x1, x4
 	# offset += idx[0] * stride
-	ldr x4, [sp]
-	# índice 1 ← stack
-	add sp, sp, #16
-	add x1, x1, x4
-	# offset += idx[1] * stride
 	lsl x1, x1, #3
 	# offset *= 8
 	sub x2, x29, #184
@@ -732,6 +744,11 @@ _start:
 	mov x1, xzr
 	# x1 = offset acumulador
 	ldr x4, [sp]
+	# índice 1 ← stack
+	add sp, sp, #16
+	add x1, x1, x4
+	# offset += idx[1] * stride
+	ldr x4, [sp]
 	# índice 0 ← stack
 	add sp, sp, #16
 	mov x5, #2
@@ -740,11 +757,6 @@ _start:
 	# idx[0] * stride
 	add x1, x1, x4
 	# offset += idx[0] * stride
-	ldr x4, [sp]
-	# índice 1 ← stack
-	add sp, sp, #16
-	add x1, x1, x4
-	# offset += idx[1] * stride
 	lsl x1, x1, #3
 	# offset *= 8 (sizeof element)
 	sub x2, x29, #184
@@ -778,6 +790,11 @@ _start:
 	mov x1, xzr
 	# x1 = offset acumulador
 	ldr x4, [sp]
+	# índice 1 ← stack
+	add sp, sp, #16
+	add x1, x1, x4
+	# offset += idx[1] * stride
+	ldr x4, [sp]
 	# índice 0 ← stack
 	add sp, sp, #16
 	mov x5, #2
@@ -786,11 +803,6 @@ _start:
 	# idx[0] * stride
 	add x1, x1, x4
 	# offset += idx[0] * stride
-	ldr x4, [sp]
-	# índice 1 ← stack
-	add sp, sp, #16
-	add x1, x1, x4
-	# offset += idx[1] * stride
 	lsl x1, x1, #3
 	# offset *= 8
 	sub x2, x29, #184
@@ -820,6 +832,7 @@ _start:
 	adrp x0, .str_2
 	add x0, x0, :lo12:.str_2
 	bl printf
+.epilogue__start:
 	add sp, sp, #480
 	# restaurar stack pointer
 	ldp x29, x30, [sp], #16
