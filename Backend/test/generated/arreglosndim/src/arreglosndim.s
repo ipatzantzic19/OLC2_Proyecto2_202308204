@@ -8,19 +8,19 @@ len = . - buffer
 .str_0: .string "=== INICIO DE CALIFICACION: ARREGLOS N-D ==="
 .str_1: .string "%s"
 .str_2: .string "\n"
-.str_3: .string "\n--- 5.6 INDICE DE INESTABILIDAD ---"
+.str_3: .string "\n--- 5.3 INDICE DE INESTABILIDAD ---"
 .str_4: .string "Indice:"
 .str_5: .string "%s "
 .str_6: .string "%ld"
-.str_7: .string "\n--- 5.7 REGLA DE CRAMER ---"
+.str_7: .string "\n--- 5.4 REGLA DE CRAMER ---"
 .str_8: .string "x, y:"
 .str_9: .string "%ld "
-.str_10: .string "\n--- 5.8 PROMEDIO DE CAPAS ---"
+.str_10: .string "\n--- 5.5 PROMEDIO DE CAPAS ---"
 .str_11: .string "Promedios capa 0:"
 .str_12: .string "%g "
 .str_13: .string "%g"
 .str_14: .string "Promedios capa 1:"
-.str_15: .string "\n--- 5.9 SOFTMAX ---"
+.str_15: .string "\n--- 5.6 SOFTMAX ---"
 .align 2
 .flt_0: .single 1.0
 .align 2
@@ -2129,20 +2129,20 @@ promedioCapas:
 	# x0 → stack temporal (int32)
 	ldr x0, [x29, #-120]
 	# suma (int32 - 64-bit)
-	scvtf s0, x0
-	# int32 → float32
 	sub sp, sp, #16
-	# reservar slot float temporal
-	str s0, [sp]
-	# s0 stack temporal
+	# reservar slot temporal
+	str x0, [sp]
+	# x0 → stack temporal (int32)
 	# float32 literal 2.0 → s0
 	adrp x9, .flt_1
 	# página de la constante float
 	ldr s0, [x9, :lo12:.flt_1]
 	# cargar float32 IEEE-754 en s0
-	ldr s1, [sp]
-	# stack s1 (lhs float)
+	ldr x1, [sp]
+	# lhs ← stack (int32)
 	add sp, sp, #16
+	scvtf s1, x1
+	# lhs int32 → float32 (promotion)
 	fdiv s0, s1, s0
 	# float32 división
 	mov x1, xzr

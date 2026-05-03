@@ -6,11 +6,12 @@ Este manual explica, **paso a paso**, cómo instalar, abrir, usar y entender los
 
 ## 1) ¿Qué es Golampi IDE?
 
-Golampi IDE es una interfaz web para escribir y ejecutar código Golampi usando:
+Golampi IDE es una interfaz web para escribir código en el lenguaje **Golampi** y compilarlo a **código ARM64** (ensamblador para arquitectura ARM de 64 bits):
 
 - **Frontend**: Svelte + Monaco Editor.
-- **Backend**: PHP + ANTLR4.
-- **Reportes**: consola de salida, tabla de errores y tabla de símbolos.
+- **Backend**: PHP + ANTLR4 para análisis léxico/sintáctico.
+- **Compilador**: ARM64Generator que traduce Golampi a ensamblador.
+- **Reportes**: tabla de errores de compilación y tabla de símbolos con análisis semántico.
 
 ---
 
@@ -71,42 +72,49 @@ chmod +x start.sh
 
 Esto inicia:
 
-- Frontend: `http://localhost:5173`
-- Backend API: `http://localhost:8000/api`
+- **Frontend**: `http://localhost:5173` (IDE web)
+- **Backend Compiler API**: `http://localhost:8000/api` (servicio de compilación)
 
 ### Paso 5. Abrir la herramienta
 
-En el navegador entra a:
+En el navegador abre:
 
-`http://localhost:5173`
+```
+http://localhost:5173
+```
 
-> Si usas `Ctrl + C` en la terminal donde corre `start.sh`, se detienen frontend y backend.
+> Si presionas `Ctrl + C` en la terminal donde corre `start.sh`, se detienen ambos servicios. Verifica que no haya otros procesos usando puertos 5173 u 8000.
 
 ---
 
 ## 4) Recorrido completo de la interfaz
 
-### 4.1 Captura general de la interfaz
+### 4.1 Vista general de la interfaz
 
-![Interfaz principal de Golampi IDE](../img/interfaz.png)
+![Interfaz principal de Golampi IDE](../img/intefaz.png)
 
 ### 4.2 ¿Qué hace cada zona?
 
 1. **Barra superior (toolbar)**
-	 - Contiene los botones de archivo y ejecución.
+	 - Contiene los botones para gestionar archivos y compilación.
 
 2. **Editor central (Monaco)**
 	 - Aquí escribes/pegas tu código Golampi.
-	 - Tiene resaltado de sintaxis y sugerencias/autocompletado.
+	 - Ofrece resaltado de sintaxis automático, indentación y sugerencias.
 
-3. **Panel derecho: Output Console**
-	 - Muestra mensajes del sistema, salida de `fmt.Println`, errores y estado final.
+3. **Panel derecho: OUTPUT CONSOLE**
+	 - Muestra mensajes del sistema y errores de compilación.
+	 - Indica si la compilación fue exitosa o falló.
 
-4. **Barra inferior: Reports & Analysis**
-	 - Botones para abrir los reportes de análisis (errores y símbolos).
+4. **Panel inferior: ASSEMBLY VIEW**
+	 - Muestra el código **ARM64** generado por el compilador.
+	 - Incluye syntax highlighting para mejor legibilidad.
 
-5. **Etiquetas de tecnología (abajo derecha)**
-	 - `PHP-SVR` y `ANTLR4` son etiquetas informativas del stack.
+5. **Barra de reportes**
+	 - Botones para abrir la tabla de errores y tabla de símbolos del análisis.
+
+6. **Etiquetas informativas (abajo derecha)**
+	 - `PHP-SVR` y `ANTLR4` identifican el stack tecnológico.
 
 ---
 
@@ -115,40 +123,43 @@ En el navegador entra a:
 ### 5.1 Barra superior
 
 - **New**
-	- Crea un archivo nuevo con plantilla base (`package main` + `func main`).
-	- Muestra confirmación para descartar cambios no guardados.
+	- Crea un archivo nuevo con plantilla base de código Golampi.
+	- Plantilla incluye estructura mínima funcional.
+	- Pide confirmación si hay código sin guardar.
 
 - **Load**
 	- Abre selector de archivos para cargar un archivo con extensión `.go`.
-	- Al cargarlo, su contenido se coloca en el editor y actualiza el nombre de archivo.
+	- Al cargar, su contenido reemplaza el del editor.
+	- Actualiza el nombre del archivo actual.
 
 - **Save**
-	- Descarga el contenido actual del editor como archivo de texto.
-	- Usa como nombre el archivo actual (por defecto `main.go`, o el nombre del último archivo cargado).
+	- Descarga el contenido actual del editor como archivo `.go`.
+	- Usa el nombre del archivo actual (o `main.go` por defecto).
 
-- **Run Interpreter**
-	- Envía el código al backend y ejecuta el intérprete.
-	- Mientras ejecuta, el editor queda temporalmente en solo lectura para evitar cambios durante la ejecución.
-	- Al terminar, actualiza consola, errores y tabla de símbolos.
+- **Compile to ARM64**
+	- Envía el código al backend para compilación.
+	- El compilador genera código ensamblador ARM64.
+	- Mientras compila, el editor queda en solo lectura.
+	- Actualiza: consola, panel de assembly, errores y tabla de símbolos.
 
 - **Clear**
-	- Limpia salida de consola, lista de errores y tabla de símbolos en pantalla.
-	- No borra automáticamente el código del editor.
+	- Limpia la consola de salida, la vista de assembly y los modales de reporte.
+	- **No borra el código del editor.**
 
 ### 5.2 Barra inferior
 
 - **REPORTS & ANALYSIS**
-	- Botón de sección visual (encabezado de área de reportes).
+	- Encabezado visual para la sección de reportes.
 
 - **AST**
-	- Botón reservado para análisis AST.
-	- Actualmente no muestra una vista AST funcional en esta interfaz.
+	- Botón reservado para análisis del árbol sintáctico abstracto.
+	- Disponibilidad futura.
 
 - **Errors Table**
-	- Abre un modal con la tabla de errores de la **última ejecución**.
+	- Abre un modal con los errores de la **última compilación**.
 
 - **Symbol Table**
-	- Abre un modal con la tabla de símbolos de la **última ejecución**.
+	- Abre un modal con la tabla de símbolos del **último análisis**.
 
 ### 5.3 Modal de reportes
 
@@ -157,7 +168,7 @@ En el navegador entra a:
 
 ---
 
-## 6) Crear, editar y ejecutar código
+## 6) Crear, editar y compilar código
 
 ### 6.1 Crear código nuevo
 
@@ -181,12 +192,13 @@ func main() {
 - Puedes copiar/pegar código desde otros archivos.
 - Puedes cargar un archivo existente con **Load**.
 
-### 6.3 Ejecutar código
+### 6.3 Compilar código
 
-1. Clic en **Run Interpreter**.
-2. Revisa el panel **OUTPUT CONSOLE**.
-3. Si hay errores, abre **Errors Table**.
-4. Para revisar variables y ámbitos, abre **Symbol Table**.
+1. Clic en **Compile to ARM64**.
+2. Revisa el panel **OUTPUT CONSOLE** para ver el estado de compilación.
+3. El panel **ASSEMBLY VIEW** mostrará el código ARM64 generado.
+4. Si hay errores, abre **Errors Table** para revisar detalles.
+5. Usa **Symbol Table** para verificar variables, tipos y alcances.
 
 ### 6.4 Guardar tu trabajo
 
@@ -198,58 +210,78 @@ func main() {
 
 ### 7.1 Consola de salida
 
-La consola mezcla mensajes de infraestructura y salida del programa:
+La consola muestra el estado y mensajes de compilación:
 
-- `system`: mensajes del proceso (inicio de conexión, etc.)
-- `success`: ejecución finalizada correctamente
-- `error`: fallas de conexión o errores de ejecución
-- `output`: líneas impresas por el programa
+- `system`: mensajes de infraestructura (iniciando compilación, etc.)
+- `success`: compilación completada exitosamente
+- `error`: fallos de conexión o errores durante compilación
+- `info`: información adicional del proceso
 
 Guía rápida:
 
-- Si ves solo `output` y `success`, la ejecución fue correcta.
-- Si aparece `error`, revisa detalle en **Errors Table**.
+- Si ves `success` al final, la compilación fue correcta.
+- Si aparece `error`, revisa el detalle en **Errors Table**.
+- El panel **ASSEMBLY VIEW** solo se actualiza con compilación exitosa.
 
-### 7.2 Tabla de errores
+### 7.2 Panel ASSEMBLY VIEW
 
-![Tabla de errores](<../img/tabla de errores.png>)
+![Panel de visualización de código ARM64](../img/intefaz.png)
+
+Este panel muestra el **código ensamblador ARM64** generado:
+
+- **Directivas**: `.section`, `.global`, `.type`, etc.
+- **Etiquetas**: nombres de funciones (`main:`, `_function_name:`)
+- **Instrucciones**: operaciones ARM64 (`mov`, `add`, `str`, `ldr`, etc.)
+- **Prólogos/Epílogos**: gestión del stack frame de cada función
+
+Características:
+
+- Syntax highlighting automático para mejor legibilidad
+- Scroll independiente del editor
+- Contenido actualizado tras cada compilación exitosa
+
+### 7.3 Tabla de errores
+
+![Tabla de errores de compilación](../img/interfaz%20errores.png)
 
 Columnas:
 
 - `#`: identificador interno del error
-- `Tipo`: categoría (Léxico, Sintáctico, Semántico, Ejecución, etc.)
-- `Descripcion`: mensaje específico del problema
-- `Line`: línea donde se detectó
-- `Column`: columna donde se detectó
+- `Tipo`: categoría (Léxico, Sintáctico, Semántico, etc.)
+- `Descripción`: mensaje específico del problema
+- `Línea`: número de línea donde se detectó el error
+- `Columna`: posición dentro de la línea
 
-Cómo usarla correctamente:
+Cómo usarla:
 
-1. Prioriza el **primer error** de la lista (muchos errores siguientes son cascada).
-2. Corrige línea y columna reportadas.
-3. Ejecuta de nuevo para verificar.
+1. **Prioriza el primer error** — muchos errores siguientes son cascada del primero.
+2. Localiza la línea y columna en el editor.
+3. Corrige el error indicado.
+4. Vuelve a compilar con **Compile to ARM64**.
 
-### 7.3 Tabla de símbolos
+### 7.4 Tabla de símbolos
 
-![Tabla de símbolos](<../img/tabla de simbolos.png>)
+![Tabla de símbolos con análisis semántico](../img/interfaz%20simbolos.png)
 
 Columnas:
 
-- `Identificador`: nombre de variable/función
-- `Tipo`: tipo inferido o declarado (`int32`, `function`, etc.)
-- `Valor`: valor final al terminar ejecución
-- `Ambito`: `global`, `function:main`, `for`, `if-block`, etc.
-- `Line` y `Column`: ubicación de declaración
+- `Identificador`: nombre de variable, función o constante
+- `Tipo`: tipo inferido o declarado (`int32`, `float64`, `function`, etc.)
+- `Valor`: valor final al terminar el análisis
+- `Ámbito`: contexto de declaración (`global`, `function:main`, `for`, `if-block`, etc.)
+- `Línea` y `Columna`: ubicación de la declaración en el código
 
 Cómo leerla:
 
-- Si un nombre aparece repetido en distinto ámbito (ej. `x` en `function:main` y `if-block`), **no es error**; son declaraciones diferentes.
-- El valor mostrado es el **valor final registrado** para esa declaración al cerrar su scope.
+- Si un nombre aparece repetido en distinto ámbito (ej. `x` en `function:main` y `if-block`), **no es error** — son declaraciones en contextos diferentes.
+- El valor mostrado es el registrado para ese símbolo al finalizar el análisis semántico.
+- Variables no inicializadas pueden mostrar valor vacío o predeterminado.
 
 ---
 
 ## 8) Ejemplo de sesión de uso (completa)
 
-### Escenario A: ejecución correcta
+### Escenario A: compilación correcta
 
 1. Clic en **New**.
 2. Escribe:
@@ -265,53 +297,70 @@ func main() {
 }
 ```
 
-3. Clic en **Run Interpreter**.
-4. En consola debería aparecer una salida similar a `Suma: 12` y mensaje de éxito.
-5. Abre **Symbol Table** y verifica `a`, `b`, `suma` con sus valores.
+3. Clic en **Compile to ARM64**.
+4. La consola debe mostrar un mensaje de éxito.
+5. El panel **ASSEMBLY VIEW** mostrará el código ARM64 generado para esta función.
+6. Abre **Symbol Table** y verifica `a`, `b`, `suma` con sus tipos y valores.
 
-### Escenario B: detectar y corregir errores
+### Escenario B: detectar y corregir errores de compilación
 
-1. Modifica una línea con un error (por ejemplo, usa un identificador no declarado).
-2. Ejecuta con **Run Interpreter**.
-3. Abre **Errors Table** y ubica `Tipo`, `Line`, `Column`.
-4. Corrige en editor y vuelve a ejecutar.
+1. Modifica una línea introduciendo un error (ej. usar variable no declarada).
+2. Ejecuta **Compile to ARM64**.
+3. La consola indicará error; abre **Errors Table** para ver detalles (tipo, línea, columna).
+4. Corrige en el editor y vuelve a compilar.
+5. Una vez exitoso, verifica el assembly generado en **ASSEMBLY VIEW**.
 
 ---
 
-## 9) Capturas incluidas y qué revisar en cada una
+## 9) Imágenes de referencia y qué revisar en cada una
 
-- **Interfaz general**: [interfaz.png](../img/interfaz.png)
-	- Úsala para ubicar toolbar, editor, consola y barra de reportes.
+- **Interfaz general**: [intefaz.png](../img/intefaz.png)
+	- Muestra toolbar, editor, assembly view, consola y barra de reportes.
+	- Úsala para orientarte en la interfaz completa.
 
-- **Reporte de errores**: [tabla de errores.png](../img/tabla%20de%20errores.png)
-	- Úsala para aprender a corregir código con línea/columna.
+- **Reporte de errores**: [interfaz errores.png](../img/interfaz%20errores.png)
+	- Tabla con errores de compilación.
+	- Úsala para ubicar línea/columna de errores y corregir código.
 
-- **Reporte de símbolos**: [tabla de simbolos.png](../img/tabla%20de%20simbolos.png)
-	- Úsala para validar variables, tipo, ámbito y valor final.
+- **Reporte de símbolos**: [interfaz simbolos.png](../img/interfaz%20simbolos.png)
+	- Tabla con variables, funciones, tipos y alcances.
+	- Úsala para validar tipos de datos y ámbitos de variables.
 
 ---
 
 ## 10) Problemas comunes y solución rápida
 
-- **No carga la interfaz web**
-	- Verifica que frontend esté en `http://localhost:5173`.
-
-- **Error de conexión al ejecutar**
-	- Verifica backend en `http://localhost:8000/api`.
-	- Revisa si `start.sh` sigue corriendo en terminal.
-
-- **Load no muestra archivos**
-	- Asegúrate de usar extensión `.go`.
-
-- **No veo símbolos/errores en modal**
-	- Ejecuta primero el código con **Run Interpreter**; los modales muestran la última ejecución.
+| Problema | Solución |
+|----------|----------|
+| No carga la interfaz web | Verifica que frontend esté en `http://localhost:5173`. |
+| Error de conexión al compilar | Verifica backend en `http://localhost:8000/api`; revisa si `start.sh` sigue corriendo. |
+| Load no muestra archivos | Asegúrate de usar extensión `.go` en los nombres de archivo. |
+| No veo el código ARM64 | Compila primero con botón **Compile to ARM64**; solo aparece tras compilación exitosa. |
+| No veo símbolos/errores en modal | Ejecuta primero la compilación; los modales muestran resultados de la última compilación. |
+| Puertos 5173 u 8000 ya en uso | Usa `lsof -i :5173` (o :8000) para identificar proceso; termínalo o cambia puerto en `vite.config.js` o `index.php`. |
 
 ---
 
 ## 11) Recomendaciones de uso
 
-- Ejecuta frecuentemente en bloques pequeños de código.
-- Guarda versiones con **Save** antes de cambios grandes.
-- Si aparecen muchos errores, corrige primero el más temprano (menor línea).
-- Usa la tabla de símbolos para verificar scopes y valores finales en `for`, `if` y funciones.
+- **Compila frecuentemente** en bloques pequeños de código para detectar errores rápidamente.
+- **Guarda versiones** con **Save** antes de cambios grandes.
+- **Corrige primero el error más temprano** (línea menor) — muchas veces resuelve cascadas de errores.
+- **Usa la tabla de símbolos** para verificar tipos, valores y alcances tras compilación exitosa.
+- **Revisa el código ARM64** generado para entender cómo el compilador traduce tu código.
+- **Mantén archivo limpio**: borra código de prueba antes de guardar versiones finales.
+
+---
+
+## 12) Glosario rápido
+
+| Término | Definición |
+|---------|-----------|
+| **Golampi** | Lenguaje de programación compilado diseñado para OLC2. |
+| **ARM64** | Arquitectura de procesador de 64 bits; generamos código ensamblador para esta arquitectura. |
+| **ANTLR4** | Framework para análisis léxico y sintáctico; genera parseadores desde gramáticas. |
+| **Compilación** | Proceso de traducir código fuente Golampi a código ensamblador ARM64. |
+| **Símbolo** | Variable, función, constante o tipo identificado y catalogado durante análisis semántico. |
+| **Ámbito** | Contexto (global, función, bloque condicional, etc.) donde un símbolo es válido. |
+| **Assembly/Ensamblador** | Código de bajo nivel que representa instrucciones directas del procesador. |
 
