@@ -151,7 +151,8 @@ expressionStatement
 
 // ==================== EXPRESIONES ====================
 expression
-    : logicalOr
+    : logicalOr '?' expression ':' expression   # TernaryExpr
+    | logicalOr                                 # NonTernaryExpr
     ;
 
 logicalOr

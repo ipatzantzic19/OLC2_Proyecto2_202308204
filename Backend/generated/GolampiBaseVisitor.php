@@ -415,7 +415,18 @@ class GolampiBaseVisitor extends AbstractParseTreeVisitor implements GolampiVisi
 	 * The default implementation returns the result of calling
 	 * {@see self::visitChildren()} on `context`.
 	 */
-	public function visitExpression(Context\ExpressionContext $context)
+	public function visitTernaryExpr(Context\TernaryExprContext $context)
+	{
+	    return $this->visitChildren($context);
+	}
+
+	/**
+	 * {@inheritdoc}
+	 *
+	 * The default implementation returns the result of calling
+	 * {@see self::visitChildren()} on `context`.
+	 */
+	public function visitNonTernaryExpr(Context\NonTernaryExprContext $context)
 	{
 	    return $this->visitChildren($context);
 	}

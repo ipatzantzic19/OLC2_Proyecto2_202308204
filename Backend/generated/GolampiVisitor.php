@@ -353,13 +353,24 @@ interface GolampiVisitor extends ParseTreeVisitor
 	public function visitExpressionStatement(Context\ExpressionStatementContext $context);
 
 	/**
-	 * Visit a parse tree produced by {@see GolampiParser::expression()}.
+	 * Visit a parse tree produced by the `TernaryExpr` labeled alternative
+	 * in {@see GolampiParser::expression()}.
 	 *
-	 * @param Context\ExpressionContext $context The parse tree.
+	 * @param Context\TernaryExprContext $context The parse tree.
 	 *
 	 * @return mixed The visitor result.
 	 */
-	public function visitExpression(Context\ExpressionContext $context);
+	public function visitTernaryExpr(Context\TernaryExprContext $context);
+
+	/**
+	 * Visit a parse tree produced by the `NonTernaryExpr` labeled alternative
+	 * in {@see GolampiParser::expression()}.
+	 *
+	 * @param Context\NonTernaryExprContext $context The parse tree.
+	 *
+	 * @return mixed The visitor result.
+	 */
+	public function visitNonTernaryExpr(Context\NonTernaryExprContext $context);
 
 	/**
 	 * Visit a parse tree produced by {@see GolampiParser::logicalOr()}.

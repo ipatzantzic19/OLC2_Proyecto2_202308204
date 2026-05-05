@@ -31,6 +31,34 @@ namespace Golampi\Compiler\ARM64\Traits\Expressions;
 trait ExpressionEntry
 {
     /**
+     * Visitador específico para expresiones ternarias
+     * 
+     * Gramática: expression : logicalOr '?' expression ':' expression # TernaryExpr
+     * 
+     * @return string Tipo del resultado
+     */
+    public function visitTernaryExpr($ctx)
+    {
+        $endLabel  = $this->newLabel('tern_end');
+        $falseLabel = $this->newLabel('tern_false');
+
+        // Evaluar condición (child 0: logicalOr)
+        $this->visit($ctx->getChild(0));
+        $this->emit("cbz x0, $falseLabel", 'ternario: si falso → rama else');
+
+        // Rama verdadera (child 2: expression)
+        $trueType = $this->visitChildren($ctx->getChild(2));
+        $this->emit("b $endLabel", 'ternario: salta al final');
+
+        // Rama falsa
+        $this->label($falseLabel);
+        $falseType = $this->visitChildren($ctx->getChild(4));
+
+        $this->label($endLabel);
+        return $trueType ?? $falseType ?? 'int32';
+    }
+
+    /**
      * Punto de entrada de toda evaluación de expresión.
      * Simplemente delega al primer nivel de la jerarquía (logicalOr).
      *
@@ -38,6 +66,7 @@ trait ExpressionEntry
      */
     public function visitExpression($ctx)
     {
+        // No ternario: delegar a logicalOr
         return $this->visit($ctx->logicalOr());
     }
 }
